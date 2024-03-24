@@ -183,6 +183,7 @@ run_spark_shell() {
   echo -e "$(cat ./tests/integration/resources/test-spark-shell.scala | spark-client.spark-shell \
       --username=${USERNAME} \
       --conf spark.kubernetes.container.image=$SPARK_IMAGE \
+      --conf spark.executor.instances=2) \
       --namespace ${NAMESPACE})" \
       > spark-shell.out
   pi=$(cat spark-shell.out  | grep "^Pi is roughly" | rev | cut -d' ' -f1 | rev | cut -c 1-3)
