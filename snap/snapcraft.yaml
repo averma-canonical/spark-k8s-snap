@@ -20,7 +20,7 @@ plugs:
     - $HOME/.kube/config
 
 environment:
-  JAVA_HOME: $SNAP/usr/lib/jvm/java-11-openjdk-amd64
+  JAVA_HOME: $SNAP/usr/lib/jvm/java-17-openjdk-amd64
   PATH: $JAVA_HOME/bin:$PATH:$SNAP:$SNAP/opt/$CRAFT_PROJECT_NAME:$SNAP/opt/k8s:$SNAP/opt/spark
   KUBECONFIG: $SNAP_REAL_HOME/.kube/config
   SPARK_HOME: $SNAP/opt/spark
@@ -99,10 +99,10 @@ parts:
     build-packages:
         - ca-certificates
         - ca-certificates-java
-        - openjdk-11-jre-headless
+        - openjdk-17-jre-headless
         - wget
     stage-packages:
-        - openjdk-11-jre-headless
+        - openjdk-17-jre-headless
     override-build: |
         SPARK_HADOOP_VERSION='3'
         AWS_JAVA_SDK_BUNDLE_VERSION='1.11.874'
