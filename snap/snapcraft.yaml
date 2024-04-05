@@ -3,7 +3,7 @@ base: core22
 version: '3.4.2'
 summary: Client side scripts to submit Spark jobs to a cluster.
 description: |
-  The spark-client snap includes the scripts spark-submit, spark-shell, pyspark  and other tools for managing Apache Spark jobs.
+  The spark-client snap includes the scripts spark-submit, spark-shell, pyspark and other tools for managing Apache Spark jobs.
 
 grade: stable
 confinement: strict
