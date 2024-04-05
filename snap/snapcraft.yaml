@@ -99,10 +99,10 @@ parts:
     build-packages:
         - ca-certificates
         - ca-certificates-java
-        - openjdk-11-jre-headless
+        - openjdk-17-jre-headless
         - wget
     stage-packages:
-        - openjdk-11-jre-headless
+        - openjdk-17-jre-headless
     override-build: |
         SPARK_HADOOP_VERSION='3'
         AWS_JAVA_SDK_BUNDLE_VERSION='1.11.874'
