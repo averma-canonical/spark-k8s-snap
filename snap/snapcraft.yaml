@@ -129,24 +129,7 @@ parts:
             exit 1
         fi
         tar -zxf "spark-${SPARK_VERSION}-bin-k8s.tgz"
-        cd "spark-${SPARK_VERSION}-bin-k8s/jars"
-        wget "https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/${AWS_JAVA_SDK_BUNDLE_VERSION}/aws-java-sdk-bundle-${AWS_JAVA_SDK_BUNDLE_VERSION}.jar"
-        wget "https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/${AWS_JAVA_SDK_BUNDLE_VERSION}/aws-java-sdk-bundle-${AWS_JAVA_SDK_BUNDLE_VERSION}.jar.sha1"        
-        echo "`cat aws-java-sdk-bundle-${AWS_JAVA_SDK_BUNDLE_VERSION}.jar.sha1`  aws-java-sdk-bundle-${AWS_JAVA_SDK_BUNDLE_VERSION}.jar" | sha1sum --check
-        if  [[ $? -ne 0 ]]
-          then
-            echo "DOWNLOAD ERROR: aws-java-sdk-bundle-${AWS_JAVA_SDK_BUNDLE_VERSION}.jar could not be downloaded properly! Exiting...."
-            exit 1
-        fi
-        wget "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/${HADOOP_AWS_VERSION}/hadoop-aws-${HADOOP_AWS_VERSION}.jar"
-        wget "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/${HADOOP_AWS_VERSION}/hadoop-aws-${HADOOP_AWS_VERSION}.jar.sha1"
-        echo "`cat hadoop-aws-${HADOOP_AWS_VERSION}.jar.sha1`  hadoop-aws-${HADOOP_AWS_VERSION}.jar" | sha1sum --check
-        if  [[ $? -ne 0 ]]
-          then
-            echo "DOWNLOAD ERROR: hadoop-aws-${HADOOP_AWS_VERSION}.jar could not be downloaded properly! Exiting...."
-            exit 1
-        fi
-        cd ..
+        cd "spark-${SPARK_VERSION}-bin-k8s/"
         SPARK_DIR=$CRAFT_PART_INSTALL/opt/spark
         mkdir -p $SPARK_DIR/bin
         cp -r bin/* $SPARK_DIR/bin
