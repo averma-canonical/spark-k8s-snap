@@ -104,9 +104,6 @@ parts:
     stage-packages:
         - openjdk-17-jre-headless
     override-build: |
-        SPARK_HADOOP_VERSION='3'
-        AWS_JAVA_SDK_BUNDLE_VERSION='1.11.874'
-        HADOOP_AWS_VERSION='3.2.2'
         SPARK_VERSION=$(cat $CRAFT_PROJECT_DIR/SPARK_VERSION | tr -d '\n')
         TAG=$( echo ${SPARK_VERSION%-*} )
         TARBALL_URL="https://github.com/canonical/central-uploader/releases/download/spark-${TAG}/spark-${SPARK_VERSION}-bin-k8s.tgz"
