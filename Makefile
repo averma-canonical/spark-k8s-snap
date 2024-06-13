@@ -19,6 +19,8 @@ build_tag := $(package_dir)/.build_tag
 install_tag := $(package_dir)/.install_tag
 k8s_tag := $(package_dir)/.k8s_tag
 aws_tag := $(package_dir)/.aws_tag
+azure_tag := $(package_dir)/.azure_tag
+
 
 # ======================
 # Rules and Dependencies
@@ -64,14 +66,19 @@ $(k8s_tag):
 
 $(aws_tag): $(k8s_tag)
 	@echo "=== Setting up and configure AWS CLI ==="
-	/bin/bash ./tests/integration/config-aws-cli.sh
+	/bin/bash ./tests/integration/setup-aws-cli.sh
 	touch $(aws_tag)
+
+$(azure_tag): $(k8s_tag)
+	@echo "=== Setting up and configure AWS CLI ==="
+	/bin/bash ./tests/integration/setup-azure-cli.sh
+	touch $(azure_tag)
 
 microk8s: $(k8s_tag)
 
 install_if_missing: microk8s
 
-integration-tests: $(k8s_tag) $(aws_tag)
+integration-tests: $(k8s_tag) $(aws_tag) $(azure_tag)
 ifndef SNAP_EXISTS
 	@echo "Installing snap first"
 	make install
@@ -85,3 +92,4 @@ clean:
 	@echo "==Cleaning environment=="
 	rm -rf .make_cache .coverage .kube
 	rm -rf $(shell find . -name "*.pyc") $(shell find . -name "__pycache__")
+	snapcraft clean
