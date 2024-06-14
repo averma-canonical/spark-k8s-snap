@@ -51,7 +51,6 @@ jobs:
 
       - name: Setup microceph
         id: microceph
-        if: ${{ matrix.tox-environments }} == 'integration-tls'
         uses: canonical/microceph-action@v0.2
         with:
           channel: 'latest/edge'
