@@ -49,6 +49,23 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Setup microceph
+        id: microceph
+        if: ${{ matrix.tox-environments }} == 'integration-tls'
+        uses: canonical/microceph-action@v0.2
+        with:
+          channel: 'latest/edge'
+          accesskey: 'accesskey'
+          secretkey: 'secretkey'
+          bucket: 'testbucket'
+          osdsize: '3G'
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+
       - name: Setup MicroK8s
         run: |
           make microk8s

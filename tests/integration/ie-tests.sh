@@ -354,6 +354,56 @@ test_example_job_with_s3() {
   fi
 }
 
+run_spark_submit_custom_certificate(){
+
+  spark-client.service-account-registry delete --username hello
+  source microceph.source
+
+  echo "MICRO CEPH credentials"
+  echo $S3_SERVER_URL
+  echo $S3_ACCESS_KEY
+  echo $S3_SECRET_KEY
+  echo $S3_CA_BUNDLE_PATH
+
+  aws configure set aws_access_key_id $S3_ACCESS_KEY
+  aws configure set aws_secret_access_key $S3_SECRET_KEY
+  aws configure set default.region "us-east-2"
+
+  # aws --endpoint-url "http://$S3_SERVER_URL" s3 cp FILE s3://""/"$BASE_NAME"
+
+  spark-client.service-account-registry create --username hello \
+    --conf spark.hadoop.fs.s3a.access.key=$S3_ACCESS_KEY \
+    --conf spark.hadoop.fs.s3a.secret.key=$S3_SECRET_KEY \
+    --conf spark.hadoop.fs.s3a.endpoint=$S3_SERVER_URL \
+    --conf spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
+    --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
+    --conf spark.hadoop.fs.s3a.path.style.access=true \
+    --conf spark.eventLog.enabled=true \
+    --conf spark.eventLog.dir=s3a://history-server/spark-events/ \
+    --conf spark.history.fs.logDirectory=s3a://history-server/spark-events/
+
+  echo "Read configs"
+  spark-client.service-account-registry get-config --username hello
+  
+  sudo apt install s3cmd -y
+  echo "Generate truststore"
+  keytool -import -alias ceph-cert -file $S3_CA_BUNDLE_PATH -storetype JKS -keystore cacerts -storepass changeit -noprompt
+  mv cacerts spark.truststore
+  echo "Create secret for truststore"
+  sudo microk8s.kubectl create secret generic spark-truststore --from-file spark.truststore
+  # Import certificate
+  echo "Import certificate"
+  spark-client.import-certificate ceph-cert $S3_CA_BUNDLE_PATH
+  echo "Configure Service account"
+  spark-client.service-account-registry add-config --username hello \
+      --conf spark.executor.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
+      --conf spark.driver.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
+      --conf spark.kubernetes.executor.secrets.spark-truststore=/spark-truststore \
+      --conf spark.kubernetes.driver.secrets.spark-truststore=/spark-truststore 
+  echo "Run Spark job"
+  spark-client.spark-submit --username hello --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --files="./tests/integration/resources/testpod.yaml" --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.1.jar 100
+}
+
 
 run_spark_sql() {
   # Run the example SQL script line by line on spark-sql
