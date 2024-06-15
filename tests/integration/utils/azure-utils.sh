@@ -6,7 +6,7 @@
 # To use them, simply `source` this file in your bash script.
 
 # Early check to see if the two required environment variables are set.
-if [[ -z "${AZURE_STORAGE_ACCOUNT}" || -z "{$AZURE_STORAGE_KEY}" ]]; then
+if [[ -z "${AZURE_STORAGE_ACCOUNT}" || -z "${AZURE_STORAGE_KEY}" ]]; then
   echo "Error: AZURE_STORAGE_ACCOUNT and/or AZURE_STORAGE_KEY variable is not set."
   exit 1
 fi

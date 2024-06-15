@@ -54,9 +54,8 @@ jobs:
           make microk8s
 
       - name: Run Integration Tests
+        env:
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_KEY: ${{ secrets.AZURE_STORAGE_KEY }}
         run: |
-          sg microk8s -c \
-            "make integration-tests \
-                  AZURE_STORAGE_ACCOUNT=${{ secrets.AZURE_STORAGE_ACCOUNT }} \
-                  AZURE_STORAGE_KEY=${{ secrets.AZURE_STORAGE_KEY }}"
-
+          sg microk8s -c "make integration-tests"

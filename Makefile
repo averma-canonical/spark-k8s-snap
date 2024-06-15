@@ -90,7 +90,7 @@ $(aws_tag): $(k8s_tag)
 
 # A market that signifies that Azure CLI has been installed and
 # configured successfully.
-$(azure_tag): $(k8s_tag)
+$(azure_tag):
 	@echo "=== Setting up and configure AWS CLI ==="
 	/bin/bash ./tests/integration/setup-azure-cli.sh
 	touch $(azure_tag)
@@ -114,7 +114,9 @@ ifndef SNAP_EXISTS
 	@echo "Installing snap first"
 	make install
 endif
-	sg microk8s tests/integration/ie-tests.sh
+	@export AZURE_STORAGE_ACCOUNT=$(AZURE_STORAGE_ACCOUNT) \
+				AZURE_STORAGE_KEY=$(AZURE_STORAGE_KEY) \
+	&& sg microk8s tests/integration/ie-tests.sh
 
 
 # Recipe for cleaning the building environment. 
