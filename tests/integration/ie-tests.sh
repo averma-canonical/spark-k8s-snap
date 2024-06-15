@@ -151,8 +151,7 @@ run_pyspark_s3() {
 
   # Copy 'example.txt' script to 'test' bucket
   copy_file_to_s3_bucket $S3_BUCKET ./tests/integration/resources/example.txt
-
-  echo -e "$(cat ./tests/integration/resources/test-pyspark-s3.py | sed 's/S3_BUCKET/${S3_BUCKET}/g' | spark-client.pyspark \
+  echo -e "$(sed "s/S3_BUCKET/$S3_BUCKET/g" ./tests/integration/resources/test-pyspark-s3.py | spark-client.pyspark \
       --username=${USERNAME} \
       --conf spark.kubernetes.container.image=$SPARK_IMAGE \
       --conf spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
