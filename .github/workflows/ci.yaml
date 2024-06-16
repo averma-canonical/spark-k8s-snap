@@ -53,7 +53,7 @@ jobs:
         id: microceph
         uses: canonical/microceph-action@v0.2
         with:
-          channel: 'latest/edge'
+          channel: 'latest/stable'
           accesskey: 'accesskey'
           secretkey: 'secretkey'
           bucket: 'testbucket'

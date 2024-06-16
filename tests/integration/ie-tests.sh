@@ -220,7 +220,6 @@ run_pyspark(){
   return $?
 }
 
-
 test_pyspark_with_s3(){
   temp_script_file=/tmp/test-pyspark-s3.py
   example_txt_path=s3a://${S3_BUCKET}/example.txt
@@ -354,6 +353,10 @@ test_example_job_with_s3() {
   fi
 }
 
+test_spark_submit_custom_certificate() {
+  run_spark_submit_custom_certificate
+}
+
 run_spark_submit_custom_certificate(){
 
   spark-client.service-account-registry delete --username hello
@@ -369,6 +372,9 @@ run_spark_submit_custom_certificate(){
   aws configure set aws_secret_access_key $S3_SECRET_KEY
   aws configure set default.region "us-east-2"
 
+  aws --endpoint-url "http://$S3_SERVER_URL" s3 mb "s3://dist-cache"
+  aws --endpoint-url "http://$S3_SERVER_URL" s3 mb "s3://history-server"
+
   # aws --endpoint-url "http://$S3_SERVER_URL" s3 cp FILE s3://""/"$BASE_NAME"
 
   spark-client.service-account-registry create --username hello \
@@ -379,6 +385,7 @@ run_spark_submit_custom_certificate(){
     --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
     --conf spark.hadoop.fs.s3a.path.style.access=true \
     --conf spark.eventLog.enabled=true \
+    --conf spark.kubernetes.file.upload.path=s3a://dist-cache/ \
     --conf spark.eventLog.dir=s3a://history-server/spark-events/ \
     --conf spark.history.fs.logDirectory=s3a://history-server/spark-events/
 
@@ -592,3 +599,4 @@ echo -e "##################################"
 echo -e "##################################"
 echo -e "END OF THE TEST!"
 echo -e "##################################"
+
