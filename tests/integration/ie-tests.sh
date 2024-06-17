@@ -372,8 +372,8 @@ run_spark_submit_custom_certificate(){
   aws configure set aws_secret_access_key $S3_SECRET_KEY
   aws configure set default.region "us-east-2"
 
-  aws --endpoint-url "$S3_SERVER_URL" s3 mb "s3://dist-cache"
-  aws --endpoint-url "$S3_SERVER_URL" s3 mb "s3://history-server"
+  aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 mb "s3://dist-cache" 
+  aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 mb "s3://history-server"
 
   # aws --endpoint-url "http://$S3_SERVER_URL" s3 cp FILE s3://""/"$BASE_NAME"
 
