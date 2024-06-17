@@ -358,7 +358,7 @@ test_spark_submit_custom_certificate() {
 }
 
 run_spark_submit_custom_certificate(){
-
+  set -x 
   spark-client.service-account-registry delete --username hello
   source microceph.source
 
@@ -412,7 +412,8 @@ run_spark_submit_custom_certificate(){
       --conf spark.kubernetes.executor.secrets.spark-truststore=/spark-truststore \
       --conf spark.kubernetes.driver.secrets.spark-truststore=/spark-truststore 
   echo "Run Spark job"
-  spark-client.spark-submit --username hello --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --files="./tests/integration/resources/testpod.yaml" --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.1.jar 100
+  spark-client.spark-submit --username hello --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --files="./tests/integration/resources/testpod.yaml" --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
+  set +x
 }
 
 
