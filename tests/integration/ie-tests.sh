@@ -415,6 +415,36 @@ run_spark_submit_custom_certificate(){
   spark-client.service-account-registry get-config --username hello
   echo "Run Spark job"
   spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --files="./tests/integration/resources/testpod.yaml" --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
+  
+  
+  # kubectl --kubeconfig=${KUBE_CONFIG} get pods
+  DRIVER_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)
+
+  if [[ "${DRIVER_JOB}" == "${PREVIOUS_JOB}" ]]
+  then
+    echo "ERROR: Sample job has not run!"
+    exit 1
+  fi
+
+  echo -e "Inspecting logs for driver job: ${DRIVER_JOB}"
+  # kubectl --kubeconfig=${KUBE_CONFIG} logs ${DRIVER_JOB}
+
+  EXECUTOR_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep exec | tail -n 1 | cut -d' ' -f1)
+  echo -e "Inspecting state of executor job: ${EXECUTOR_JOB}"
+  # kubectl --kubeconfig=${KUBE_CONFIG} describe pod ${EXECUTOR_JOB}
+
+  logs=$(kubectl --kubeconfig=${KUBE_CONFIG} logs $(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)  -n ${NAMESPACE})
+  echo "logs: $logs"
+  # Check job output
+  # Sample output
+  # "Pi is roughly 3.13956232343"
+  pi=$(kubectl --kubeconfig=${KUBE_CONFIG} logs $(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)  -n ${NAMESPACE} | grep 'Pi is roughly' | rev | cut -d' ' -f1 | rev | cut -c 1-3)
+  echo -e "Spark Pi Job Output: \n ${pi}"
+
+  validate_pi_value $pi
+
+  
+  
   set +x
 }
 
