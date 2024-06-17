@@ -362,7 +362,7 @@ run_spark_submit_custom_certificate(){
   spark-client.service-account-registry delete --username hello
   source microceph.source
 
-  echo "MICRO CEPH credentials"
+  echo "MICRO-CEPH credentials"
   echo $S3_SERVER_URL
   echo $S3_ACCESS_KEY
   echo $S3_SECRET_KEY
@@ -395,11 +395,11 @@ run_spark_submit_custom_certificate(){
   sudo apt install s3cmd -y
   echo "Generate truststore"
 
-  cp $S3_CA_BUNDLE_PATH spark.truststore
+  cp $S3_CA_BUNDLE_PATH ca.pem
 
+  keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
 
-  keytool -import -alias ceph-cert -file spark.truststore -storetype JKS -keystore cacerts -storepass changeit -noprompt
-  
+  mv cacerts spark.truststore
   echo "Create secret for truststore"
   sudo microk8s.kubectl create secret generic spark-truststore --from-file spark.truststore
   # Import certificate
@@ -411,6 +411,8 @@ run_spark_submit_custom_certificate(){
       --conf spark.driver.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
       --conf spark.kubernetes.executor.secrets.spark-truststore=/spark-truststore \
       --conf spark.kubernetes.driver.secrets.spark-truststore=/spark-truststore 
+  echo "Print current config."
+  spark-client.service-account-registry get-config --username hello
   echo "Run Spark job"
   spark-client.spark-submit --username hello --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --files="./tests/integration/resources/testpod.yaml" --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
   set +x
