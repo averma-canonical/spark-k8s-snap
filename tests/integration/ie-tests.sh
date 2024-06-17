@@ -361,7 +361,7 @@ run_spark_submit_custom_certificate(){
   set -x 
   spark-client.service-account-registry delete --username hello
   source microceph.source
-
+  NAMESPACE="default"
   echo "MICRO-CEPH credentials"
   echo $S3_SERVER_URL
   echo $S3_ACCESS_KEY
