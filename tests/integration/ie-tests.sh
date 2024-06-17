@@ -394,13 +394,17 @@ run_spark_submit_custom_certificate(){
   
   sudo apt install s3cmd -y
   echo "Generate truststore"
-  keytool -import -alias ceph-cert -file $S3_CA_BUNDLE_PATH -storetype JKS -keystore cacerts -storepass changeit -noprompt
-  mv cacerts spark.truststore
+
+  cp $S3_CA_BUNDLE_PATH spark.trustore
+
+
+  keytool -import -alias ceph-cert -file spark.trustore -storetype JKS -keystore cacerts -storepass changeit -noprompt
+  
   echo "Create secret for truststore"
   sudo microk8s.kubectl create secret generic spark-truststore --from-file spark.truststore
   # Import certificate
   echo "Import certificate"
-  spark-client.import-certificate ceph-cert $S3_CA_BUNDLE_PATH
+  spark-client.import-certificate ceph-cert spark.trustore
   echo "Configure Service account"
   spark-client.service-account-registry add-config --username hello \
       --conf spark.executor.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
