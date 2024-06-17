@@ -382,7 +382,7 @@ run_spark_submit_custom_certificate(){
     --conf spark.hadoop.fs.s3a.secret.key=$S3_SECRET_KEY \
     --conf spark.hadoop.fs.s3a.endpoint=$S3_SERVER_URL \
     --conf spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
-    --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
+    --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true \
     --conf spark.hadoop.fs.s3a.path.style.access=true \
     --conf spark.eventLog.enabled=true \
     --conf spark.kubernetes.file.upload.path=s3a://dist-cache/ \
@@ -404,7 +404,7 @@ run_spark_submit_custom_certificate(){
   sudo microk8s.kubectl create secret generic spark-truststore --from-file spark.truststore
   # Import certificate
   echo "Import certificate"
-  spark-client.import-certificate ceph-cert spark.truststore
+  spark-client.import-certificate ceph-cert ca.pem
   echo "Configure Service account"
   spark-client.service-account-registry add-config --username hello \
       --conf spark.executor.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
