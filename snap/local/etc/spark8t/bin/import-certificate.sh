@@ -13,7 +13,7 @@ then
     echo "Certificate imported!"
     
     echo "List inserted cert:"
-    ${SNAP}/usr/lib/jvm/java-17-openjdk-amd64/bin/keytool -list -keystore ${SNAP_DATA}/etc/ssl/certs/java/cacerts -alias "$1"
+    ${SNAP}/usr/lib/jvm/java-17-openjdk-amd64/bin/keytool -list -keystore ${SNAP_DATA}/etc/ssl/certs/java/cacerts -alias "$1"  -storepass changeit
 
 
 else
