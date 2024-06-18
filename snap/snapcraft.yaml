@@ -40,7 +40,7 @@ apps:
     environment:
       PYTHONPATH: $SNAP/python:$SNAP/lib/python3.10/site-packages:$PYTHONPATH
       # SPARK8T_EXTRA_CONF: --conf spark.driver.extraJavaOptions="-Duser.home=$SNAP_USER_DATA"
-      _JAVA_OPTIONS: "-Duser.home=$SNAP_USER_DATA -Djavax.net.ssl.trustStore=$SNAP_DATA/etc/ssl/certs/java/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
+      _JAVA_OPTIONS: "-Duser.home=$SNAP_USER_DATA -Djavax.net.debug=all -Djavax.net.ssl.trustStore=$SNAP_DATA/etc/ssl/certs/java/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
       # JDK_JAVA_OPTIONS: "-Duser.home=$SNAP_USER_DATA -Djavax.net.ssl.trustStore=$SNAP_DATA/etc/ssl/certs/java/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
     plugs:
         - network
