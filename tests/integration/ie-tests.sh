@@ -396,10 +396,11 @@ run_spark_submit_custom_certificate(){
   echo "Generate truststore"
 
   cp $S3_CA_BUNDLE_PATH ca.pem
-
+  cat ca.pem
   keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
-
+  ls -larth
   mv cacerts spark.truststore
+  cat spark.truststore
   echo "Create secret for truststore"
   sudo microk8s.kubectl create secret generic spark-truststore --from-file spark.truststore
   # Import certificate
@@ -441,6 +442,7 @@ run_spark_submit_custom_certificate(){
   pi=$(kubectl --kubeconfig=${KUBE_CONFIG} logs $(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)  -n ${NAMESPACE} | grep 'Pi is roughly' | rev | cut -d' ' -f1 | rev | cut -c 1-3)
   echo -e "Spark Pi Job Output: \n ${pi}"
 
+  aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 ls "s3://dist-cache" 
   validate_pi_value $pi
 
   
