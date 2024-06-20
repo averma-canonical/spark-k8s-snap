@@ -7,7 +7,7 @@ source ./tests/integration/utils/s3-utils.sh
 source ./tests/integration/utils/azure-utils.sh
 
 
-readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark:3.4-22.04_edge'
+readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark@sha256:fd458fbbe4b90232ec657c92375da01789396f914865bcb4c0f919bf33c031f4'
 S3_BUCKET=test-snap-$(uuidgen)
 AZURE_CONTAINER=$S3_BUCKET
 SERVICE_ACCOUNT=spark
@@ -50,7 +50,7 @@ setup_s3_properties(){
     --conf spark.hadoop.fs.s3a.secret.key=$(get_s3_secret_key) \
     --conf spark.sql.warehouse.dir=s3a://$S3_BUCKET/warehouse \
     --conf spark.sql.catalog.local.warehouse=s3a://$S3_BUCKET/warehouse \
-    --conf hive.metastore.warehouse.dir=s3a://$S3_BUCKET/hwarehouse  
+    --conf spark.hadoop.hive.metastore.warehouse.dir=s3a://$S3_BUCKET/hwarehouse  
 }
 
 
@@ -66,7 +66,7 @@ setup_azure_storage_properties(){
     --conf spark.hadoop.fs.azure.account.key.$account_name.dfs.core.windows.net=$secret_key \
     --conf spark.sql.warehouse.dir=$warehouse_path \
     --conf spark.sql.catalog.local.warehouse=$warehouse_path \
-    --conf hive.metastore.warehouse.dir=$warehouse_path 
+    --conf spark.hadoop.hive.metastore.warehouse.dir=$warehouse_path 
 }
 
 
@@ -326,11 +326,12 @@ run_spark_sql() {
       return 1
   fi
   return 0
+
 }
 
 
 test_spark_sql_with_s3() {
-
+  # Test Spark SQL with S3 as object storage
   create_s3_bucket $S3_BUCKET
 
   setup_s3_properties
@@ -346,6 +347,8 @@ test_spark_sql_with_s3() {
 
 
 test_spark_sql_with_azure_abfss() {
+  # Test Spark SQL with Azure Storage as object storage (using abfss protocol)
+
   create_azure_container $AZURE_CONTAINER
 
   setup_azure_storage_properties
@@ -384,7 +387,7 @@ setup_user() {
 }
 
 setup_user_admin_context() {
-  setup_user spark tests
+  setup_user $SERVICE_ACCOUNT $NAMESPACE
 }
 
 setup_user_restricted_context() {
@@ -397,6 +400,8 @@ cleanup_user() {
   NAMESPACE=$3
 
   spark-client.service-account-registry delete --username=${USERNAME} --namespace ${NAMESPACE}
+
+  rm -rf metastore_db/ derby.log
 
   OUTPUT=$(spark-client.service-account-registry list)
 
@@ -427,20 +432,20 @@ cleanup_user_failure() {
 
 setup_tests
 
-# (setup_user_admin_context && test_spark_pi_example && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_pi_example && cleanup_user_success) || cleanup_user_failure
 
-# (setup_user_admin_context && test_spark_shell && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_shell && cleanup_user_success) || cleanup_user_failure
 
 (setup_user_admin_context && test_spark_sql_with_s3 && cleanup_user_success) || cleanup_user_failure
 
-# (setup_user_admin_context && test_spark_sql_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_sql_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
-# (setup_user_admin_context && test_pyspark_with_s3 && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_pyspark_with_s3 && cleanup_user_success) || cleanup_user_failure
 
-# (setup_user_admin_context && test_pyspark_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_pyspark_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
-# (setup_user_admin_context && test_example_job_with_s3 && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_example_job_with_s3 && cleanup_user_success) || cleanup_user_failure
 
-# (setup_user_admin_context && test_example_job_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_example_job_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
-# (setup_user_restricted_context && test_restricted_account && cleanup_user_success) || cleanup_user_failure
+(setup_user_restricted_context && test_restricted_account && cleanup_user_success) || cleanup_user_failure
