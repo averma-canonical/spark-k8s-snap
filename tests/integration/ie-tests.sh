@@ -9,7 +9,6 @@ source ./tests/integration/utils/azure-utils.sh
 
 readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark@sha256:fd458fbbe4b90232ec657c92375da01789396f914865bcb4c0f919bf33c031f4'
 S3_BUCKET=test-snap-$(uuidgen)
-AZURE_CONTAINER=$S3_BUCKET
 SERVICE_ACCOUNT=spark
 NAMESPACE=tests
 
@@ -56,6 +55,11 @@ setup_s3_properties(){
 
 setup_azure_storage_properties(){
   # Setup Azure Storage related Spark properties in the service account
+  # 
+  # Arguments:
+  # $1: The name of the azure container
+
+  AZURE_CONTAINER=$1
 
   warehouse_path=$(construct_resource_uri $AZURE_CONTAINER warehouse abfss)
   account_name=$(get_azure_storage_account_name)
@@ -199,6 +203,7 @@ test_pyspark_with_s3(){
 }
 
 test_pyspark_with_azure_abfss(){
+  AZURE_CONTAINER=test-snap-$(uuidgen)
   temp_script_file=/tmp/test-pyspark-s3.py
   example_txt_path=$(construct_resource_uri $AZURE_CONTAINER example.txt abfss)
   sed "s|EXAMPLE_TEXT_FILE|$example_txt_path|g" ./tests/integration/resources/test-pyspark-s3.py > $temp_script_file
@@ -206,7 +211,7 @@ test_pyspark_with_azure_abfss(){
   create_azure_container $AZURE_CONTAINER
   copy_file_to_azure_container $AZURE_CONTAINER ./tests/integration/resources/example.txt
 
-  setup_azure_storage_properties
+  setup_azure_storage_properties $AZURE_CONTAINER
   run_pyspark $temp_script_file
   retcode=$?
 
@@ -260,7 +265,7 @@ run_example_job(){
 }
 
 test_example_job_with_azure_abfss() {
-
+  AZURE_CONTAINER=test-snap-$(uuidgen)
   AZURE_STORAGE_ACCOUNT=$(get_azure_storage_account_name)
   AZURE_STORAGE_KEY=$(get_azure_storage_secret_key)
 
@@ -271,7 +276,7 @@ test_example_job_with_azure_abfss() {
   copy_file_to_azure_container $AZURE_CONTAINER ./tests/integration/resources/example.txt
   copy_file_to_azure_container $AZURE_CONTAINER ./tests/integration/resources/test-job.py
 
-  setup_azure_storage_properties
+  setup_azure_storage_properties $AZURE_CONTAINER
 
   example_txt_path=$(construct_resource_uri $AZURE_CONTAINER example.txt abfss)
   test_job_py_path=$(construct_resource_uri $AZURE_CONTAINER test-job.py abfss)
@@ -348,10 +353,10 @@ test_spark_sql_with_s3() {
 
 test_spark_sql_with_azure_abfss() {
   # Test Spark SQL with Azure Storage as object storage (using abfss protocol)
-
+  AZURE_CONTAINER=test-snap-$(uuidgen)
   create_azure_container $AZURE_CONTAINER
 
-  setup_azure_storage_properties
+  setup_azure_storage_properties $AZURE_CONTAINER
   run_spark_sql
   retcode=$?
 
