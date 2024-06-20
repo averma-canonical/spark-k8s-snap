@@ -18,13 +18,13 @@ if ! azcli storage container list > /dev/null 2>&1; then
 fi
 
 
-get_storage_account(){
+get_azure_storage_account_name(){
   # Print the name of the azure container (from the environment variable).
   echo $AZURE_STORAGE_ACCOUNT
 }
 
 
-get_azure_secret_key(){
+get_azure_storage_secret_key(){
   # Print the secret key for the Azure storage account used for test.
   echo $AZURE_STORAGE_KEY
 }
@@ -83,7 +83,7 @@ construct_resource_uri(){
   container=$1
   path=$2
   protocol=$3
-  account_name=$(get_storage_account)
+  account_name=$(get_azure_storage_account_name)
 
   case "$protocol" in
     "abfs")
