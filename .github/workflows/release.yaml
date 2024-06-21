@@ -40,6 +40,7 @@ jobs:
 
   build:
     uses: ./.github/workflows/ci.yaml
+    secrets: inherit
 
   publish:
     name: Publish Snap
