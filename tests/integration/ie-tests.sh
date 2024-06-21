@@ -7,7 +7,7 @@ source ./tests/integration/utils/s3-utils.sh
 source ./tests/integration/utils/azure-utils.sh
 
 
-readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark@sha256:fd458fbbe4b90232ec657c92375da01789396f914865bcb4c0f919bf33c031f4'
+readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark:3.4-22.04_edge'
 S3_BUCKET=test-snap-$(uuidgen)
 SERVICE_ACCOUNT=spark
 NAMESPACE=tests
