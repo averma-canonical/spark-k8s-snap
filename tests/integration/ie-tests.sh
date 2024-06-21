@@ -1,6 +1,17 @@
 #!/bin/bash
 
+# Copyright 2024 Canonical Ltd.
+
+# Import reusable utilities
+source ./tests/integration/utils/s3-utils.sh
+source ./tests/integration/utils/azure-utils.sh
+
+
 readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark:3.4-22.04_edge'
+S3_BUCKET=test-snap-$(uuidgen)
+SERVICE_ACCOUNT=spark
+NAMESPACE=tests
+
 
 setup_tests() {
   sudo snap connect spark-client:dot-kube-config
@@ -11,8 +22,9 @@ validate_pi_value() {
 
   if [ "${pi}" != "3.1" ]; then
       echo "ERROR: Computed Value of pi is $pi, Expected Value: 3.1. Aborting with exit code 1."
-      exit 1
+      return 1
   fi
+  return 0
 }
 
 validate_file_length() {
@@ -25,52 +37,44 @@ validate_file_length() {
   fi
 }
 
-get_s3_access_key(){
-  # Prints out S3 Access Key by reading it from K8s secret
-  kubectl get secret -n minio-operator microk8s-user-1 -o jsonpath='{.data.CONSOLE_ACCESS_KEY}' | base64 -d
+setup_s3_properties(){
+  # Setup S3 related Spark properties in the service account
+  spark-client.service-account-registry add-config \
+    --username $SERVICE_ACCOUNT --namespace $NAMESPACE \
+    --conf spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
+    --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
+    --conf spark.hadoop.fs.s3a.path.style.access=true \
+    --conf spark.hadoop.fs.s3a.endpoint=$(get_s3_endpoint) \
+    --conf spark.hadoop.fs.s3a.access.key=$(get_s3_access_key) \
+    --conf spark.hadoop.fs.s3a.secret.key=$(get_s3_secret_key) \
+    --conf spark.sql.warehouse.dir=s3a://$S3_BUCKET/warehouse \
+    --conf spark.sql.catalog.local.warehouse=s3a://$S3_BUCKET/warehouse \
+    --conf spark.hadoop.hive.metastore.warehouse.dir=s3a://$S3_BUCKET/hwarehouse  
 }
 
-get_s3_secret_key(){
-  # Prints out S3 Secret Key by reading it from K8s secret
-  kubectl get secret -n minio-operator microk8s-user-1 -o jsonpath='{.data.CONSOLE_SECRET_KEY}' | base64 -d
+
+setup_azure_storage_properties(){
+  # Setup Azure Storage related Spark properties in the service account
+  # 
+  # Arguments:
+  # $1: The name of the azure container
+
+  AZURE_CONTAINER=$1
+
+  warehouse_path=$(construct_resource_uri $AZURE_CONTAINER warehouse abfss)
+  account_name=$(get_azure_storage_account_name)
+  secret_key=$(get_azure_storage_secret_key)
+
+  spark-client.service-account-registry add-config \
+    --username $SERVICE_ACCOUNT --namespace $NAMESPACE \
+    --conf spark.hadoop.fs.azure.account.key.$account_name.dfs.core.windows.net=$secret_key \
+    --conf spark.sql.warehouse.dir=$warehouse_path \
+    --conf spark.sql.catalog.local.warehouse=$warehouse_path \
+    --conf spark.hadoop.hive.metastore.warehouse.dir=$warehouse_path 
 }
 
-get_s3_endpoint(){
-  # Prints out the endpoint S3 bucket is exposed on.
-  kubectl get service minio -n minio-operator -o jsonpath='{.spec.clusterIP}'
-}
 
-create_s3_bucket(){
-  # Creates a S3 bucket with the given name.
-  BUCKET_NAME=$1
-  aws s3 mb "s3://$BUCKET_NAME"
-  echo "Created S3 bucket ${BUCKET_NAME}"
-}
-
-delete_s3_bucket(){
-  # Deletes a S3 bucket with the given name.
-  S3_ENDPOINT=$(get_s3_endpoint)
-  BUCKET_NAME=$1
-  aws s3 rb "s3://$BUCKET_NAME" --force
-  echo "Deleted S3 bucket ${BUCKET_NAME}"
-}
-
-copy_file_to_s3_bucket(){
-  # Copies a file from local to S3 bucket.
-  # The bucket name and the path to file that is to be uploaded is to be provided as arguments
-  BUCKET_NAME=$1
-  FILE_PATH=$2
-
-  # If file path is '/foo/bar/file.ext', the basename is 'file.ext'
-  BASE_NAME=$(basename "$FILE_PATH")
-  S3_ENDPOINT=$(get_s3_endpoint)
-
-  # Copy the file to S3 bucket
-  aws --endpoint-url "http://$S3_ENDPOINT" s3 cp $FILE_PATH s3://"$BUCKET_NAME"/"$BASE_NAME"
-  echo "Copied file ${FILE_PATH} to S3 bucket ${BUCKET_NAME}"
-}
-
-run_example_job() {
+run_spark_pi_example() {
 
   KUBE_CONFIG=/home/${USER}/.kube/config
 
@@ -119,11 +123,13 @@ run_example_job() {
   echo -e "Spark Pi Job Output: \n ${pi}"
 
   validate_pi_value $pi
-
+  if [ $? -eq 1 ]; then
+    exit 1
+  fi
 }
 
-test_example_job() {
-  run_example_job tests spark
+test_spark_pi_example() {
+  run_spark_pi_example tests spark
 }
 
 run_spark_shell() {
@@ -144,126 +150,227 @@ run_spark_shell() {
   echo -e "Spark-shell Pi Job Output: \n ${pi}"
   rm spark-shell.out
   validate_pi_value $pi
+  if [ $? -eq 1 ]; then
+    exit 1
+  fi
 }
 
 test_spark_shell() {
   run_spark_shell tests spark
 }
 
-run_pyspark() {
-  echo "run_pyspark ${1} ${2}"
 
-  NAMESPACE=$1
-  USERNAME=$2
+run_pyspark(){
+  # Run PySpark with an test script provided.
+  # Arguments:
+  # $1: The path to the Python script that is to be executed by PySpark
+  
+  script_path=$1
 
-  # Check job output
-  # Sample output
-  # "Pi is roughly 3.13956232343"
-  echo -e "$(cat ./tests/integration/resources/test-pyspark.py | spark-client.pyspark \
-      --username=${USERNAME} \
+  cat $script_path
+
+  echo -e "$(cat $script_path | spark-client.pyspark \
+      --username=${SERVICE_ACCOUNT} \
       --conf spark.kubernetes.container.image=$SPARK_IMAGE \
       --namespace ${NAMESPACE} --conf spark.executor.instances=2)" \
       > pyspark.out
-  cat pyspark.out
-  pi=$(cat pyspark.out  | grep "^Pi is roughly" | rev | cut -d' ' -f1 | rev | cut -c 1-3)
-  echo -e "Pyspark Pi Job Output: \n ${pi}"
+  l=$(cat pyspark.out  | grep -oP 'Number of lines \K[0-9]+' )
   rm pyspark.out
-  validate_pi_value $pi
-}
-
-run_pyspark_s3() {
-  echo "run_pyspark_s3 ${1} ${2}"
-
-  NAMESPACE=$1
-  USERNAME=$2
-
-  ACCESS_KEY="$(get_s3_access_key)"
-  SECRET_KEY="$(get_s3_secret_key)"
-  S3_ENDPOINT="$(get_s3_endpoint)"
-
-  aws configure set aws_access_key_id $ACCESS_KEY
-  aws configure set aws_secret_access_key $SECRET_KEY
-  aws configure set default.region "us-east-2"
-
-  # First create S3 bucket named 'test'
-  create_s3_bucket test
-
-  # Copy 'example.txt' script to 'test' bucket
-  copy_file_to_s3_bucket test ./tests/integration/resources/example.txt
-
-  echo -e "$(cat ./tests/integration/resources/test-pyspark-s3.py | spark-client.pyspark \
-      --username=${USERNAME} \
-      --conf spark.kubernetes.container.image=$SPARK_IMAGE \
-      --conf spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
-      --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
-      --conf spark.hadoop.fs.s3a.path.style.access=true \
-      --conf spark.hadoop.fs.s3a.endpoint=$S3_ENDPOINT \
-      --conf spark.hadoop.fs.s3a.access.key=$ACCESS_KEY \
-      --conf spark.hadoop.fs.s3a.secret.key=$SECRET_KEY \
-      --namespace ${NAMESPACE} --conf spark.executor.instances=2)" \
-      > pyspark.out
-  cat pyspark.out
-  l=$(cat pyspark.out  | grep "Number of lines" | rev | cut -d' ' -f1 | rev | cut -c 1-3)
-  echo -e "Number of lines: \n ${l}"
-  rm pyspark.out
-  delete_s3_bucket test
   validate_file_length $l
+  return $?
 }
+
+
+test_pyspark_with_s3(){
+  temp_script_file=/tmp/test-pyspark-s3.py
+  example_txt_path=s3a://${S3_BUCKET}/example.txt
+  sed "s|EXAMPLE_TEXT_FILE|$example_txt_path|g" ./tests/integration/resources/test-pyspark-s3.py > $temp_script_file
+
+  create_s3_bucket $S3_BUCKET
+  copy_file_to_s3_bucket $S3_BUCKET ./tests/integration/resources/example.txt
+
+  setup_s3_properties
+  run_pyspark $temp_script_file
+  retcode=$?
+
+  rm $temp_script_file
+  delete_s3_bucket $S3_BUCKET
+
+  if [ $retcode -eq 1 ]; then
+    exit 1
+  fi
+
+}
+
+test_pyspark_with_azure_abfss(){
+  AZURE_CONTAINER=test-snap-$(uuidgen)
+  temp_script_file=/tmp/test-pyspark-s3.py
+  example_txt_path=$(construct_resource_uri $AZURE_CONTAINER example.txt abfss)
+  sed "s|EXAMPLE_TEXT_FILE|$example_txt_path|g" ./tests/integration/resources/test-pyspark-s3.py > $temp_script_file
+
+  create_azure_container $AZURE_CONTAINER
+  copy_file_to_azure_container $AZURE_CONTAINER ./tests/integration/resources/example.txt
+
+  setup_azure_storage_properties $AZURE_CONTAINER
+  run_pyspark $temp_script_file
+  retcode=$?
+
+  rm $temp_script_file
+  delete_azure_container $AZURE_CONTAINER
+
+  if [ $retcode -eq 1 ]; then
+    exit 1
+  fi
+}
+
+
+run_example_job(){
+  # Run a given example job with spark-submit.
+  #
+  # Arguments:
+  # $1: The path to the spark job that is to be processed
+  # $2: The path to the example.txt file required for this test
+
+  test_job_py_path=$1
+  example_txt_path=$2
+
+  KUBE_CONFIG=/home/${USER}/.kube/config
+  PREVIOUS_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods | grep driver | tail -n 1 | cut -d' ' -f1)
+
+  spark-client.spark-submit \
+    --username=${SERVICE_ACCOUNT} --namespace=${NAMESPACE} \
+    --log-level "DEBUG" \
+    --deploy-mode cluster \
+    --conf spark.kubernetes.driver.request.cores=100m \
+    --conf spark.kubernetes.executor.request.cores=100m \
+    --conf spark.kubernetes.container.image=$SPARK_IMAGE \
+    --conf spark.executor.instances=2 \
+    $test_job_py_path $example_txt_path
+
+  DRIVER_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)
+
+  if [[ "${DRIVER_JOB}" == "${PREVIOUS_JOB}" ]]
+  then
+    echo "ERROR: Sample job has not run!"
+    return 1
+  fi
+
+  echo -e "Inspecting logs for driver job: ${DRIVER_JOB}"
+  DRIVER_LOGS=$(kubectl --kubeconfig=${KUBE_CONFIG} logs ${DRIVER_JOB} -n ${NAMESPACE})
+
+  l=$(echo $DRIVER_LOGS  | grep -oP 'Number of lines \K[0-9]+' ) 
+
+  validate_file_length $l
+  return $? 
+}
+
+test_example_job_with_azure_abfss() {
+  AZURE_CONTAINER=test-snap-$(uuidgen)
+  AZURE_STORAGE_ACCOUNT=$(get_azure_storage_account_name)
+  AZURE_STORAGE_KEY=$(get_azure_storage_secret_key)
+
+  # First create Azure storage container
+  create_azure_container $AZURE_CONTAINER
+
+  # Copy 'example.txt' script to the container
+  copy_file_to_azure_container $AZURE_CONTAINER ./tests/integration/resources/example.txt
+  copy_file_to_azure_container $AZURE_CONTAINER ./tests/integration/resources/test-job.py
+
+  setup_azure_storage_properties $AZURE_CONTAINER
+
+  example_txt_path=$(construct_resource_uri $AZURE_CONTAINER example.txt abfss)
+  test_job_py_path=$(construct_resource_uri $AZURE_CONTAINER test-job.py abfss)
+
+  run_example_job $test_job_py_path $example_txt_path 
+  retcode=$?
+
+  delete_azure_container $AZURE_CONTAINER
+
+  if [ $retcode -eq 1 ]; then
+    exit 1
+  fi
+}
+
+test_example_job_with_s3() {
+
+  # First create a S3 Bucket 
+  create_s3_bucket $S3_BUCKET
+
+  # Copy 'example.txt' and script to the S3 bucket
+  copy_file_to_s3_bucket $S3_BUCKET ./tests/integration/resources/example.txt
+  copy_file_to_s3_bucket $S3_BUCKET ./tests/integration/resources/test-job.py
+
+  setup_s3_properties
+
+  example_txt_path=s3a://$S3_BUCKET/example.txt
+  test_job_py_path=s3a://$S3_BUCKET/test-job.py
+  run_example_job $test_job_py_path $example_txt_path 
+  retcode=$?
+
+  delete_s3_bucket $S3_BUCKET
+
+  if [ $retcode -eq 1 ]; then
+    exit 1
+  fi
+}
+
 
 run_spark_sql() {
-  echo "run_spark_sql ${1} ${2}"
-
-  NAMESPACE=$1
-  USERNAME=$2
-
-  ACCESS_KEY="$(get_s3_access_key)"
-  SECRET_KEY="$(get_s3_secret_key)"
-  S3_ENDPOINT="$(get_s3_endpoint)"
-
-  # First create S3 bucket named 'test'
-  create_s3_bucket test
+  # Run the example SQL script line by line on spark-sql
 
   echo -e "$(cat ./tests/integration/resources/test-spark-sql.sql | spark-client.spark-sql \
-      --username=${USERNAME} --namespace ${NAMESPACE} \
+      --username=${SERVICE_ACCOUNT} --namespace ${NAMESPACE} \
       --conf spark.kubernetes.container.image=$SPARK_IMAGE \
-      --conf spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
-      --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
-      --conf spark.hadoop.fs.s3a.path.style.access=true \
-      --conf spark.hadoop.fs.s3a.endpoint=$S3_ENDPOINT \
-      --conf spark.hadoop.fs.s3a.access.key=$ACCESS_KEY \
-      --conf spark.hadoop.fs.s3a.secret.key=$SECRET_KEY \
-      --conf spark.sql.catalog.local.warehouse=s3a://spark/warehouse \
-      --conf spark.sql.warehouse.dir=s3a://test/warehouse \
-      --conf hive.metastore.warehouse.dir=s3a://test/hwarehouse \
       --conf spark.executor.instances=2)" > spark_sql.out 
   cat spark_sql.out
   l=$(cat spark_sql.out | grep "^Inserted Rows:" | rev | cut -d' ' -f1 | rev)
   echo -e "Number of rows inserted: ${l}"
   rm spark_sql.out
-  delete_s3_bucket test
   if [ "$l" != "3" ]; then
       echo "ERROR: Number of rows inserted: $l, Expected: 3. Aborting with exit code 1."
-      exit 1
+      return 1
+  fi
+  return 0
+
+}
+
+
+test_spark_sql_with_s3() {
+  # Test Spark SQL with S3 as object storage
+  create_s3_bucket $S3_BUCKET
+
+  setup_s3_properties
+  run_spark_sql
+  retcode=$?
+
+  delete_s3_bucket $S3_BUCKET
+
+  if [ $retcode -eq 1 ]; then
+    exit 1
   fi
 }
 
-test_pyspark() {
-  run_pyspark tests spark
+
+test_spark_sql_with_azure_abfss() {
+  # Test Spark SQL with Azure Storage as object storage (using abfss protocol)
+  AZURE_CONTAINER=test-snap-$(uuidgen)
+  create_azure_container $AZURE_CONTAINER
+
+  setup_azure_storage_properties $AZURE_CONTAINER
+  run_spark_sql
+  retcode=$?
+
+  delete_azure_container $AZURE_CONTAINER
+
+  if [ $retcode -eq 1 ]; then
+    exit 1
+  fi
 }
 
-test_pyspark_s3() {
-  run_pyspark_s3 tests spark
-}
-
-test_spark_sql() {
-  run_spark_sql tests spark
-}
 
 test_restricted_account() {
-
   kubectl config set-context spark-context --namespace=tests --cluster=prod --user=spark
-
-  run_example_job tests spark
+  run_spark_pi_example tests spark
 }
 
 setup_user() {
@@ -285,7 +392,7 @@ setup_user() {
 }
 
 setup_user_admin_context() {
-  setup_user spark tests
+  setup_user $SERVICE_ACCOUNT $NAMESPACE
 }
 
 setup_user_restricted_context() {
@@ -298,6 +405,8 @@ cleanup_user() {
   NAMESPACE=$3
 
   spark-client.service-account-registry delete --username=${USERNAME} --namespace ${NAMESPACE}
+
+  rm -rf metastore_db/ derby.log
 
   OUTPUT=$(spark-client.service-account-registry list)
 
@@ -324,264 +433,24 @@ cleanup_user_failure() {
   cleanup_user 1 spark tests
 }
 
-setup_test_pod() {
-  kubectl apply -f ./tests/integration/resources/testpod.yaml
 
-  SLEEP_TIME=1
-  for i in {1..5}
-  do
-    pod_status=$(kubectl get pod testpod | awk '{ print $3 }' | tail -n 1)
-    echo $pod_status
-    if [ "${pod_status}" == "Running" ]
-    then
-        echo "testpod is Running now!"
-        break
-    elif [ "${i}" -le "5" ]
-    then
-        echo "Waiting for the pod to come online..."
-        sleep $SLEEP_TIME
-    else
-        echo "testpod did not come up. Test Failed!"
-        exit 3
-    fi
-    SLEEP_TIME=$(expr $SLEEP_TIME \* 2);
-  done
-
-  MY_KUBE_CONFIG=$(cat /home/${USER}/.kube/config)
-
-  kubectl exec testpod -- /bin/bash -c 'mkdir -p ~/.kube'
-  kubectl exec testpod -- env KCONFIG="$MY_KUBE_CONFIG" /bin/bash -c 'echo "$KCONFIG" > ~/.kube/config'
-  kubectl exec testpod -- /bin/bash -c 'cat ~/.kube/config'
-}
-
-teardown_test_pod() {
-  kubectl delete pod testpod
-}
-
-run_example_job_in_pod() {
-  SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.4.2.jar'
-
-  PREVIOUS_JOB=$(kubectl get pods | grep driver | tail -n 1 | cut -d' ' -f1)
-
-  NAMESPACE=$1
-  USERNAME=$2
-
-
-  kubectl exec testpod -- env UU="$USERNAME" NN="$NAMESPACE" JJ="$SPARK_EXAMPLES_JAR_NAME" IM="$SPARK_IMAGE" \
-                  /bin/bash -c 'spark-client.spark-submit \
-                  --username $UU --namespace $NN \
-                  --conf spark.kubernetes.driver.request.cores=100m \
-                  --conf spark.kubernetes.executor.request.cores=100m \
-                  --conf spark.kubernetes.container.image=$IM \
-                  --class org.apache.spark.examples.SparkPi \
-                  local:///opt/spark/examples/jars/$JJ 100'
-
-  # kubectl --kubeconfig=${KUBE_CONFIG} get pods
-  DRIVER_JOB=$(kubectl get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)
-
-  if [[ "${DRIVER_JOB}" == "${PREVIOUS_JOB}" ]]
-  then
-    echo "ERROR: Sample job has not run!"
-    exit 1
-  fi
-
-  # Check job output
-  # Sample output
-  # "Pi is roughly 3.13956232343"
-  pi=$(kubectl logs $(kubectl get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)  -n ${NAMESPACE} | grep 'Pi is roughly' | rev | cut -d' ' -f1 | rev | cut -c 1-3)
-  echo -e "Spark Pi Job Output: \n ${pi}"
-
-  validate_pi_value $pi
-
-}
-
-test_example_job_in_pod() {
-  run_example_job_in_pod tests spark
-}
-
-
-run_spark_shell_in_pod() {
-  echo "run_spark_shell_in_pod ${1} ${2}"
-
-  NAMESPACE=$1
-  USERNAME=$2
-
-  SPARK_SHELL_COMMANDS=$(cat ./tests/integration/resources/test-spark-shell.scala)
-
-  # Check job output
-  # Sample output
-  # "Pi is roughly 3.13956232343"
-
-  echo -e "$(kubectl exec testpod -- env UU="$USERNAME" NN="$NAMESPACE" CMDS="$SPARK_SHELL_COMMANDS" IM="$SPARK_IMAGE" /bin/bash -c 'echo "$CMDS" | spark-client.spark-shell --username $UU --namespace $NN --conf spark.kubernetes.container.image=$IM')" > spark-shell.out
-
-  pi=$(cat spark-shell.out  | grep "^Pi is roughly" | rev | cut -d' ' -f1 | rev | cut -c 1-3)
-  echo -e "Spark-shell Pi Job Output: \n ${pi}"
-  rm spark-shell.out
-  validate_pi_value $pi
-}
-
-test_spark_shell_in_pod() {
-  run_spark_shell_in_pod tests spark
-}
-
-run_pyspark_in_pod() {
-  echo "run_pyspark_in_pod ${1} ${2}"
-
-  NAMESPACE=$1
-  USERNAME=$2
-
-  PYSPARK_COMMANDS=$(cat ./tests/integration/resources/test-pyspark.py)
-
-  # Check job output
-  # Sample output
-  # "Pi is roughly 3.13956232343"
-
-  echo -e "$(kubectl exec testpod -- env UU="$USERNAME" NN="$NAMESPACE" CMDS="$PYSPARK_COMMANDS" IM="$SPARK_IMAGE" /bin/bash -c 'echo "$CMDS" | spark-client.pyspark --username $UU --namespace $NN --conf spark.kubernetes.container.image=$IM')" > pyspark.out
-
-  cat pyspark.out
-  pi=$(cat pyspark.out  | grep "Pi is roughly" | tail -n 1 | rev | cut -d' ' -f1 | rev | cut -c 1-3)
-  echo -e "Pyspark Pi Job Output: \n ${pi}"
-  rm pyspark.out
-  validate_pi_value $pi
-}
-
-run_spark_sql_in_pod() {
-  echo "run_spark_sql_in_pod ${1} ${2}"
-
-  NAMESPACE=$1
-  USERNAME=$2
-
-  create_s3_bucket test
-
-  SPARK_SQL_COMMANDS=$(cat ./tests/integration/resources/test-spark-sql.sql)
-
-  echo -e "$(kubectl exec testpod -- \
-    env \
-      UU="$USERNAME" \
-      NN="$NAMESPACE" \
-      CMDS="$SPARK_SQL_COMMANDS" \
-      IM="$SPARK_IMAGE" \
-      ACCESS_KEY="$(get_s3_access_key)" \
-      SECRET_KEY="$(get_s3_secret_key)" \
-      S3_ENDPOINT="$(get_s3_endpoint)" \
-    /bin/bash -c 'echo "$CMDS" | spark-client.spark-sql \
-      --username $UU \
-      --namespace $NN \
-      --conf spark.kubernetes.container.image=$IM \
-      --conf spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
-      --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
-      --conf spark.hadoop.fs.s3a.path.style.access=true \
-      --conf spark.hadoop.fs.s3a.endpoint=$S3_ENDPOINT \
-      --conf spark.hadoop.fs.s3a.access.key=$ACCESS_KEY \
-      --conf spark.hadoop.fs.s3a.secret.key=$SECRET_KEY \
-      --conf spark.sql.warehouse.dir=s3a://test/warehouse \
-      --conf spark.driver.extraJavaOptions='-Dderby.system.home=/tmp/derby' \
-    ')" > spark_sql.out
-  cat spark_sql.out
-  num_rows=$(cat spark_sql.out  | grep "^Inserted Rows:" | rev | cut -d' ' -f1 | rev )
-  echo -e "Inserted Rows: ${num_rows}"
-  rm spark_sql.out
-  delete_s3_bucket test
-  if [ "$num_rows" != "3" ]; then
-      echo "ERROR: Number of rows inserted: $num_rows, Expected: 3. Aborting with exit code 1."
-      exit 1
-  fi
-}
-
-
-run_pyspark_s3_in_pod() {
-  echo "run_pyspark_s3_in_pod ${1} ${2}"
-
-  NAMESPACE=$1
-  USERNAME=$2
-
-  # Create bucket
-  create_s3_bucket test
-
-  # Copy example.txt file to the bucket
-  copy_file_to_s3_bucket test ./tests/integration/resources/example.txt
-
-  PYSPARK_COMMANDS=$(cat ./tests/integration/resources/test-pyspark-s3.py)
-
-  # Check output of pyspark process with s3 
-
-  echo -e "$(kubectl exec testpod -- \
-    env \
-      UU="$USERNAME" \
-      NN="$NAMESPACE" \
-      CMDS="$PYSPARK_COMMANDS" \
-      IM="$SPARK_IMAGE" \
-      ACCESS_KEY="$(get_s3_access_key)" \
-      SECRET_KEY="$(get_s3_secret_key)" \
-      S3_ENDPOINT="$(get_s3_endpoint)" \
-    /bin/bash -c 'echo "$CMDS" | spark-client.pyspark \
-      --username $UU \
-      --namespace $NN \
-      --conf spark.kubernetes.container.image=$IM \
-      --conf spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
-      --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
-      --conf spark.hadoop.fs.s3a.path.style.access=true \
-      --conf spark.hadoop.fs.s3a.endpoint=$S3_ENDPOINT \
-      --conf spark.hadoop.fs.s3a.access.key=$ACCESS_KEY \
-      --conf spark.hadoop.fs.s3a.secret.key=$SECRET_KEY 
-    ')" > pyspark.out
-
-  cat pyspark.out
-  l=$(cat pyspark.out | grep "Number of lines" | tail -n 1 | rev | cut -d' ' -f1 | rev | cut -c 1-3)
-  echo -e "Number of lines: \n ${l}"
-  rm pyspark.out
-  validate_file_length $l
-}
-
-test_pyspark_s3_in_pod() {
-  run_pyspark_s3_in_pod tests spark
-}
-
-
-test_pyspark_in_pod() {
-  run_pyspark_in_pod tests spark
-}
-
-test_spark_sql_in_pod() {
-  run_spark_sql_in_pod tests spark
-}
-
-test_restricted_account_in_pod() {
-
-  kubectl config set-context spark-context --namespace=tests --cluster=prod --user=spark
-
-  run_example_job_in_pod tests spark
-}
-
-cleanup_user_failure_in_pod() {
-  teardown_test_pod
-  cleanup_user_failure
-}
 
 setup_tests
 
-(setup_user_admin_context && test_example_job && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_pi_example && cleanup_user_success) || cleanup_user_failure
 
 (setup_user_admin_context && test_spark_shell && cleanup_user_success) || cleanup_user_failure
 
-(setup_user_admin_context && test_pyspark && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_sql_with_s3 && cleanup_user_success) || cleanup_user_failure
 
-(setup_user_admin_context && test_spark_sql && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_sql_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
-(setup_user_admin_context && test_pyspark_s3 && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_pyspark_with_s3 && cleanup_user_success) || cleanup_user_failure
+
+(setup_user_admin_context && test_pyspark_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
+
+(setup_user_admin_context && test_example_job_with_s3 && cleanup_user_success) || cleanup_user_failure
+
+(setup_user_admin_context && test_example_job_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
 (setup_user_restricted_context && test_restricted_account && cleanup_user_success) || cleanup_user_failure
-
-setup_test_pod
-
-(setup_user_admin_context && test_example_job_in_pod && cleanup_user_success) || cleanup_user_failure_in_pod
-
-(setup_user_admin_context && test_spark_shell_in_pod && cleanup_user_success) || cleanup_user_failure_in_pod
-
-(setup_user_admin_context && test_pyspark_in_pod && cleanup_user_success) || cleanup_user_failure_in_pod
-
-(setup_user_admin_context && test_spark_sql_in_pod && cleanup_user_success) || cleanup_user_failure_in_pod
-
-(setup_user_admin_context && test_pyspark_s3_in_pod && cleanup_user_success) || cleanup_user_failure_in_pod
-
-teardown_test_pod
