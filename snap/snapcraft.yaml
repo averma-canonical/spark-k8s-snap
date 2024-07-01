@@ -29,7 +29,7 @@ environment:
 
 apps:
   service-account-registry:
-    command: lib/python3.10/site-packages/spark8t/cli/service_account_registry.py
+    command: etc/spark8t/launcher.sh $SNAP/lib/python3.10/site-packages/spark8t/cli/service_account_registry.py
     environment:
       PYTHONPATH: $SNAP/python:$SNAP/lib/python3.10/site-packages:$SNAP/local/lib/dist-packages/:$SNAP/local/lib/dist-packages/spark8t/cli:$PYTHONPATH
     plugs:
