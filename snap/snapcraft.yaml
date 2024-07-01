@@ -37,7 +37,7 @@ apps:
         - home
         - dot-kube-config
   spark-submit:
-    command: lib/python3.10/site-packages/spark8t/cli/spark_submit.py
+    command:  etc/spark8t/launcher.sh lib/python3.10/site-packages/spark8t/cli/spark_submit.py
     environment:
       PYTHONPATH: $SNAP/python:$SNAP/lib/python3.10/site-packages:$PYTHONPATH
     plugs:
@@ -45,7 +45,7 @@ apps:
         - home
         - dot-kube-config
   spark-shell:
-    command: lib/python3.10/site-packages/spark8t/cli/spark_shell.py $SPARK8T_EXTRA_CONF
+    command: etc/spark8t/launcher.sh lib/python3.10/site-packages/spark8t/cli/spark_shell.py $SPARK8T_EXTRA_CONF
     environment:
       PYTHONPATH: $SNAP/python:$SNAP/lib/python3.10/site-packages:$PYTHONPATH
       SPARK8T_EXTRA_CONF: --conf spark.driver.extraJavaOptions="-Duser.home=$SNAP_USER_DATA" --conf spark.jars.ivy=/tmp
@@ -55,7 +55,7 @@ apps:
         - home
         - dot-kube-config
   pyspark:
-    command: lib/python3.10/site-packages/spark8t/cli/pyspark.py $SPARK8T_EXTRA_CONF
+    command: etc/spark8t/launcher.sh lib/python3.10/site-packages/spark8t/cli/pyspark.py $SPARK8T_EXTRA_CONF
     environment:
       PYTHONPATH: $SNAP/python:$SNAP/lib/python3.10/site-packages:$PYTHONPATH
       SPARK8T_EXTRA_CONF: --conf spark.driver.extraJavaOptions="-Duser.home=$SNAP_USER_DATA" --conf spark.jars.ivy=/tmp
@@ -65,7 +65,7 @@ apps:
         - home
         - dot-kube-config
   spark-sql:
-    command: lib/python3.10/site-packages/spark8t/cli/spark_sql.py $SPARK8T_EXTRA_CONF
+    command: etc/spark8t/launcher.sh lib/python3.10/site-packages/spark8t/cli/spark_sql.py $SPARK8T_EXTRA_CONF
     environment:
       PYTHONPATH: $SNAP/python:$SNAP/lib/python3.10/site-packages:$PYTHONPATH
       SPARK8T_EXTRA_CONF: --conf spark.driver.extraJavaOptions="-Duser.home=$SNAP_USER_DATA" --conf spark.jars.ivy=/tmp
