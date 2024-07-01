@@ -81,7 +81,10 @@ run_spark_pi_example() {
   SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.4.2.jar'
 
   echo $K8S_MASTER_URL
-
+  echo "env"
+  env
+  echo "KUBECONFIG: $KUBECONFIG"
+  
   PREVIOUS_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods | grep driver | tail -n 1 | cut -d' ' -f1)
 
   NAMESPACE=$1
