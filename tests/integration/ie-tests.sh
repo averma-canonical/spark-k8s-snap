@@ -74,9 +74,10 @@ setup_azure_storage_properties(){
 
 
 run_spark_pi_example() {
-
+  echo "here"
   KUBE_CONFIG=/home/${USER}/.kube/config
   export KUBECONFIG=/home/${USER}/.kube/config
+  echo "here-1"
   K8S_MASTER_URL=k8s://$(kubectl --kubeconfig=${KUBE_CONFIG} config view -o jsonpath="{.clusters[0]['cluster.server']}")
   SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.4.2.jar'
 
@@ -84,7 +85,7 @@ run_spark_pi_example() {
   echo "env"
   env
   echo "KUBECONFIG: $KUBECONFIG"
-  
+
   PREVIOUS_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods | grep driver | tail -n 1 | cut -d' ' -f1)
 
   NAMESPACE=$1
