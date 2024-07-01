@@ -12,8 +12,6 @@ S3_BUCKET=test-snap-$(uuidgen)
 SERVICE_ACCOUNT=spark
 NAMESPACE=tests
 
-KUBECONFIG="~/.kube/config"
-
 setup_tests() {
   sudo snap connect spark-client:dot-kube-config
 }
