@@ -5,4 +5,4 @@ if [[ ! -n "$KUBECONFIG" ]]; then
   KUBECONFIG="$SNAP_REAL_HOME/.kube/config"
 fi
 
-$KUBECONFIG exec $1 "$@"
+KUBECONFIG=$KUBECONFIG exec $1 "$@"
