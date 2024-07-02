@@ -525,7 +525,7 @@ echo -e "##################################"
 echo -e "TEST KUBECONFIG ENV VARIABLE"
 echo -e "##################################"
 
-(setup_user_admin_context && test_spark_pi_example && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_custom_kubeconfig_example && cleanup_user_success) || cleanup_user_failure
 
 echo -e "##################################"
 echo -e "END OF THE TEST!"
