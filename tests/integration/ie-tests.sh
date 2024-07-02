@@ -11,6 +11,7 @@ readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark:3.4-22.04_edge'
 S3_BUCKET=test-snap-$(uuidgen)
 SERVICE_ACCOUNT=spark
 NAMESPACE=tests
+KUBECONFIG=/home/${USER}/.kube/config
 
 setup_tests() {
   sudo snap connect spark-client:dot-kube-config
@@ -74,17 +75,9 @@ setup_azure_storage_properties(){
 
 
 run_spark_pi_example() {
-  echo "here"
-  KUBE_CONFIG=/home/${USER}/.kube/config
-  export KUBECONFIG=/home/${USER}/.kube/config
-  echo "here-1"
+
   K8S_MASTER_URL=k8s://$(kubectl --kubeconfig=${KUBE_CONFIG} config view -o jsonpath="{.clusters[0]['cluster.server']}")
   SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.4.2.jar'
-
-  echo $K8S_MASTER_URL
-  echo "env"
-  env
-  echo "KUBECONFIG: $KUBECONFIG"
 
   PREVIOUS_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods | grep driver | tail -n 1 | cut -d' ' -f1)
 
@@ -129,6 +122,38 @@ run_spark_pi_example() {
   if [ $? -eq 1 ]; then
     exit 1
   fi
+}
+
+test_custom_kubeconfig_example() {
+  run_custom_kubeconfig_example tests spark
+}
+
+
+run_custom_kubeconfig_example() {
+
+  echo "Testing wrong kubeconfig"
+
+  K8S_MASTER_URL=k8s://$(kubectl --kubeconfig=${KUBE_CONFIG} config view -o jsonpath="{.clusters[0]['cluster.server']}")
+  SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.4.2.jar'
+
+  PREVIOUS_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods | grep driver | tail -n 1 | cut -d' ' -f1)
+
+  NAMESPACE=$1
+  USERNAME=$2
+
+  # run the sample pi job using spark-submit
+  KUBECONFIG="/home/config" spark-client.spark-submit \
+    --username=${USERNAME} \
+    --namespace=${NAMESPACE} \
+    --log-level "DEBUG" \
+    --deploy-mode cluster \
+    --conf spark.kubernetes.driver.request.cores=100m \
+    --conf spark.kubernetes.executor.request.cores=100m \
+    --conf spark.kubernetes.container.image=$SPARK_IMAGE \
+    --class org.apache.spark.examples.SparkPi \
+    local:///opt/spark/examples/jars/$SPARK_EXAMPLES_JAR_NAME 100 > command.out
+
+  cat command.out
 }
 
 test_spark_pi_example() {
@@ -495,6 +520,12 @@ echo -e "RUN EXAMPLE WITH RESTRICTED ACCOUNT"
 echo -e "##################################"
 
 (setup_user_restricted_context && test_restricted_account && cleanup_user_success) || cleanup_user_failure
+
+echo -e "##################################"
+echo -e "TEST KUBECONFIG ENV VARIABLE"
+echo -e "##################################"
+
+(setup_user_admin_context && test_spark_pi_example && cleanup_user_success) || cleanup_user_failure
 
 echo -e "##################################"
 echo -e "END OF THE TEST!"
