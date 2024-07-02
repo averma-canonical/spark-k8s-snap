@@ -153,7 +153,16 @@ run_custom_kubeconfig_example() {
     --class org.apache.spark.examples.SparkPi \
     local:///opt/spark/examples/jars/$SPARK_EXAMPLES_JAR_NAME 100 > command.out
 
-  cat command.out
+  # retrieve the keyword that identifies the failure of the command.
+  OUTPUT=$(cat command.out | grep "not found")
+  echo "output: $OUTPUT"
+
+  N=$(echo $OUTPUT | wc -l)
+  echo "number of messages: $N"
+  if [ "${N}" == 0 ]; then
+      echo "ERROR: KUBECONFIG env variable not read correctly. Aborting with exit code 1."
+      exit 1
+  fi
 }
 
 test_spark_pi_example() {
