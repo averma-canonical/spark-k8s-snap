@@ -22,7 +22,6 @@ plugs:
 environment:
   JAVA_HOME: $SNAP/usr/lib/jvm/java-17-openjdk-amd64
   PATH: $JAVA_HOME/bin:$PATH:$SNAP:$SNAP/opt/$CRAFT_PROJECT_NAME:$SNAP/opt/k8s:$SNAP/opt/spark
-  # KUBECONFIG: $SNAP_REAL_HOME/.kube/config
   SPARK_HOME: $SNAP/opt/spark
   SPARK_CONFS: $SNAP_DATA/etc/spark8t/
   SPARK_USER_DATA: $HOME
