@@ -11,7 +11,7 @@ readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark:3.4-22.04_edge'
 S3_BUCKET=test-snap-$(uuidgen)
 SERVICE_ACCOUNT=spark
 NAMESPACE=tests
-
+KUBECONFIG=/home/${USER}/.kube/config
 
 setup_tests() {
   sudo snap connect spark-client:dot-kube-config
@@ -81,8 +81,6 @@ run_spark_pi_example() {
   K8S_MASTER_URL=k8s://$(kubectl --kubeconfig=${KUBE_CONFIG} config view -o jsonpath="{.clusters[0]['cluster.server']}")
   SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.4.2.jar'
 
-  echo $K8S_MASTER_URL
-
   PREVIOUS_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods | grep driver | tail -n 1 | cut -d' ' -f1)
 
   NAMESPACE=$1
@@ -125,6 +123,47 @@ run_spark_pi_example() {
   validate_pi_value $pi
   if [ $? -eq 1 ]; then
     exit 1
+  fi
+}
+
+test_custom_kubeconfig_example() {
+  run_custom_kubeconfig_example tests spark
+}
+
+
+run_custom_kubeconfig_example() {
+
+  echo "Testing wrong kubeconfig"
+
+  K8S_MASTER_URL=k8s://$(kubectl --kubeconfig=${KUBE_CONFIG} config view -o jsonpath="{.clusters[0]['cluster.server']}")
+  SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.4.2.jar'
+
+  PREVIOUS_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods | grep driver | tail -n 1 | cut -d' ' -f1)
+
+  NAMESPACE=$1
+  USERNAME=$2
+
+  # run the sample pi job using spark-submit
+  KUBECONFIG="/home/config" spark-client.spark-submit \
+    --username=${USERNAME} \
+    --namespace=${NAMESPACE} \
+    --log-level "DEBUG" \
+    --deploy-mode cluster \
+    --conf spark.kubernetes.driver.request.cores=100m \
+    --conf spark.kubernetes.executor.request.cores=100m \
+    --conf spark.kubernetes.container.image=$SPARK_IMAGE \
+    --class org.apache.spark.examples.SparkPi \
+    local:///opt/spark/examples/jars/$SPARK_EXAMPLES_JAR_NAME 100 > command.out
+
+  # retrieve the keyword that identifies the failure of the command.
+  OUTPUT=$(cat command.out | grep "not found")
+  echo "output: $OUTPUT"
+
+  N=$(echo $OUTPUT | wc -l)
+  echo "number of messages: $N"
+  if [ "${N}" == 0 ]; then
+      echo "ERROR: KUBECONFIG env variable not read correctly. Aborting with exit code 1."
+      exit 1
   fi
 }
 
@@ -433,24 +472,72 @@ cleanup_user_failure() {
   cleanup_user 1 spark tests
 }
 
-
+echo -e "##################################"
+echo -e "SETUP TEST"
+echo -e "##################################"
 
 setup_tests
 
+echo -e "##################################"
+echo -e "RUN EXAMPLE JOB"
+echo -e "##################################"
+
 (setup_user_admin_context && test_spark_pi_example && cleanup_user_success) || cleanup_user_failure
+
+echo -e "##################################"
+echo -e "RUN SPARK SHELL JOB"
+echo -e "##################################"
 
 (setup_user_admin_context && test_spark_shell && cleanup_user_success) || cleanup_user_failure
 
+echo -e "##################################"
+echo -e "RUN SPARK SQL JOB WITH S3"
+echo -e "##################################"
+
 (setup_user_admin_context && test_spark_sql_with_s3 && cleanup_user_success) || cleanup_user_failure
+
+echo -e "##################################"
+echo -e "RUN SPARK SQL JOB WITH AZURE ABFSS"
+echo -e "##################################"
 
 (setup_user_admin_context && test_spark_sql_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
+echo -e "##################################"
+echo -e "RUN PYSPARK JOB WITH S#"
+echo -e "##################################"
+
 (setup_user_admin_context && test_pyspark_with_s3 && cleanup_user_success) || cleanup_user_failure
+
+echo -e "##################################"
+echo -e "RUN PYSPARK JOB WITH AZURE ABFSS"
+echo -e "##################################"
 
 (setup_user_admin_context && test_pyspark_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
+echo -e "##################################"
+echo -e "RUN EXAMPLE JOB WITH S3"
+echo -e "##################################"
+
 (setup_user_admin_context && test_example_job_with_s3 && cleanup_user_success) || cleanup_user_failure
+
+echo -e "##################################"
+echo -e "RUN EXAMPLE JOB WITH AZURE ABFSS"
+echo -e "##################################"
 
 (setup_user_admin_context && test_example_job_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
+echo -e "##################################"
+echo -e "RUN EXAMPLE WITH RESTRICTED ACCOUNT"
+echo -e "##################################"
+
 (setup_user_restricted_context && test_restricted_account && cleanup_user_success) || cleanup_user_failure
+
+echo -e "##################################"
+echo -e "TEST KUBECONFIG ENV VARIABLE"
+echo -e "##################################"
+
+(setup_user_admin_context && test_custom_kubeconfig_example && cleanup_user_success) || cleanup_user_failure
+
+echo -e "##################################"
+echo -e "END OF THE TEST!"
+echo -e "##################################"
