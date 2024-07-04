@@ -154,7 +154,7 @@ parts:
 
     override-prime: |
         snapcraftctl prime
-        rm -vf usr/lib/jvm/java-11-openjdk-*/lib/security/blacklisted.certs 
+        rm -vf usr/lib/jvm/java-17-openjdk-*/lib/security/blacklisted.certs 
         # move base certs data
         mv etc/ssl/certs/java/cacerts etc/cacerts
   kubectl:
