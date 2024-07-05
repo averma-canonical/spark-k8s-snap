@@ -4,7 +4,7 @@
 
 # Import reusable utilities
 source ./tests/integration/utils/s3-utils.sh
-source ./tests/integration/utils/azure-utils.sh
+# source ./tests/integration/utils/azure-utils.sh
 
 
 readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark:3.4-22.04_edge'
@@ -359,6 +359,7 @@ test_spark_submit_custom_certificate() {
 
 run_spark_submit_custom_certificate(){
   set -x 
+  KUBE_CONFIG=/home/${USER}/.kube/config
   spark-client.service-account-registry delete --username hello
   source microceph.source
   NAMESPACE="default"
