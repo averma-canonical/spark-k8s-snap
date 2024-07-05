@@ -4,7 +4,7 @@
 
 # Import reusable utilities
 source ./tests/integration/utils/s3-utils.sh
-# source ./tests/integration/utils/azure-utils.sh
+source ./tests/integration/utils/azure-utils.sh
 
 
 readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark:3.4-22.04_edge'
@@ -358,9 +358,13 @@ test_spark_submit_custom_certificate() {
 }
 
 run_spark_submit_custom_certificate(){
-  set -x 
+  
   KUBE_CONFIG=/home/${USER}/.kube/config
+
+  # delete username if it exist
   spark-client.service-account-registry delete --username hello
+  
+  # source configuration for microceph 
   source microceph.source
   NAMESPACE="default"
   echo "MICRO-CEPH credentials"
@@ -369,15 +373,16 @@ run_spark_submit_custom_certificate(){
   echo $S3_SECRET_KEY
   echo $S3_CA_BUNDLE_PATH
 
+  # reconfigure the aws lib to work with local instance of aws
   aws configure set aws_access_key_id $S3_ACCESS_KEY
   aws configure set aws_secret_access_key $S3_SECRET_KEY
   aws configure set default.region "us-east-1"
 
+  # create folder
   aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 mb "s3://dist-cache" 
   aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 mb "s3://history-server"
 
-  # aws --endpoint-url "http://$S3_SERVER_URL" s3 cp FILE s3://""/"$BASE_NAME"
-
+  # create service account 
   spark-client.service-account-registry create --username hello \
     --conf spark.hadoop.fs.s3a.access.key=$S3_ACCESS_KEY \
     --conf spark.hadoop.fs.s3a.secret.key=$S3_SECRET_KEY \
@@ -390,31 +395,36 @@ run_spark_submit_custom_certificate(){
     --conf spark.eventLog.dir=s3a://history-server/spark-events/ \
     --conf spark.history.fs.logDirectory=s3a://history-server/spark-events/
 
-  echo "Read configs"
+
+  echo "Actual configs"
   spark-client.service-account-registry get-config --username hello
   
-  sudo apt install s3cmd -y
-  echo "Generate truststore"
 
+  echo "Generate truststore"
   cp $S3_CA_BUNDLE_PATH ca.pem
-  cat ca.pem
+  
+  # create certificate for running the Spark Job
   keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
-  ls -larth
+
   mv cacerts spark.truststore
-  cat spark.truststore
+
   echo "Create secret for truststore"
   sudo microk8s.kubectl create secret generic spark-truststore --from-file spark.truststore
+
   # Import certificate
   echo "Import certificate"
   spark-client.import-certificate ceph-cert ca.pem
-  echo "Configure Service account"
+
+  echo "Configure Service account with the new certificate"
   spark-client.service-account-registry add-config --username hello \
       --conf spark.executor.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
       --conf spark.driver.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
       --conf spark.kubernetes.executor.secrets.spark-truststore=/spark-truststore \
       --conf spark.kubernetes.driver.secrets.spark-truststore=/spark-truststore 
+  
   echo "Print current config."
   spark-client.service-account-registry get-config --username hello
+
   echo "Run Spark job"
   spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --files="./tests/integration/resources/example.txt" --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
   
@@ -445,8 +455,6 @@ run_spark_submit_custom_certificate(){
 
   aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 ls "s3://dist-cache" 
   validate_pi_value $pi
-
-  
   
   set +x
 }
@@ -576,65 +584,65 @@ echo -e "##################################"
 
 setup_tests
 
-# echo -e "##################################"
-# echo -e "RUN EXAMPLE JOB"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN EXAMPLE JOB"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_spark_pi_example && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_pi_example && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN SPARK SHELL JOB"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN SPARK SHELL JOB"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_spark_shell && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_shell && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN SPARK SQL JOB WITH S3"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN SPARK SQL JOB WITH S3"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_spark_sql_with_s3 && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_sql_with_s3 && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN SPARK SQL JOB WITH AZURE ABFSS"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN SPARK SQL JOB WITH AZURE ABFSS"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_spark_sql_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_sql_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN PYSPARK JOB WITH S3"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN PYSPARK JOB WITH S3"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_pyspark_with_s3 && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_pyspark_with_s3 && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN PYSPARK JOB WITH AZURE ABFSS"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN PYSPARK JOB WITH AZURE ABFSS"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_pyspark_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_pyspark_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN EXAMPLE JOB WITH S3"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN EXAMPLE JOB WITH S3"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_example_job_with_s3 && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_example_job_with_s3 && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN EXAMPLE JOB WITH AZURE ABFSS"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN EXAMPLE JOB WITH AZURE ABFSS"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_example_job_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_example_job_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN EXAMPLE WITH RESTRICTED ACCOUNT"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN EXAMPLE WITH RESTRICTED ACCOUNT"
+echo -e "##################################"
 
-# (setup_user_restricted_context && test_restricted_account && cleanup_user_success) || cleanup_user_failure
+(setup_user_restricted_context && test_restricted_account && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "TEST KUBECONFIG ENV VARIABLE"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "TEST KUBECONFIG ENV VARIABLE"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_custom_kubeconfig_example && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_custom_kubeconfig_example && cleanup_user_success) || cleanup_user_failure
 
 
 echo -e "##################################"
