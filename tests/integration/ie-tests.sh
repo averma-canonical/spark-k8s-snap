@@ -3,7 +3,7 @@
 # Copyright 2024 Canonical Ltd.
 
 # Import reusable utilities
-source ./tests/integration/utils/s3-utils.sh
+# source ./tests/integration/utils/s3-utils.sh
 source ./tests/integration/utils/azure-utils.sh
 
 
@@ -395,6 +395,7 @@ run_spark_submit_custom_certificate(){
     --conf spark.eventLog.dir=s3a://history-server/spark-events/ \
     --conf spark.history.fs.logDirectory=s3a://history-server/spark-events/
 
+  aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 ls
 
   echo "Actual configs"
   spark-client.service-account-registry get-config --username hello
