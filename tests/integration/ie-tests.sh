@@ -455,8 +455,7 @@ run_spark_submit_custom_certificate(){
 
   aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 ls "s3://dist-cache" 
   validate_pi_value $pi
-  
-  set +x
+
 }
 
 
