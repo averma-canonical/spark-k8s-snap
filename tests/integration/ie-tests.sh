@@ -3,7 +3,7 @@
 # Copyright 2024 Canonical Ltd.
 
 # Import reusable utilities
-source ./tests/integration/utils/s3-utils.sh
+# source ./tests/integration/utils/s3-utils.sh
 source ./tests/integration/utils/azure-utils.sh
 
 
