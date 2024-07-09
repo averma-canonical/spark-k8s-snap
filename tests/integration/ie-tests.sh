@@ -423,7 +423,7 @@ run_spark_submit_custom_certificate(){
 
   echo "Configure Service account with the new certificate"
   spark-client.service-account-registry add-config --username hello \
-      --conf spark.executor.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
+      --conf spark.executor.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.debug=SSL,handshake,data,trustmanager" \
       --conf spark.driver.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.debug=SSL,handshake,data,trustmanager" \
       --conf spark.kubernetes.executor.secrets.spark-truststore=/spark-truststore \
       --conf spark.kubernetes.driver.secrets.spark-truststore=/spark-truststore \
