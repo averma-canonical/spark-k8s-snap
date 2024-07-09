@@ -427,7 +427,7 @@ run_spark_submit_custom_certificate(){
       --conf spark.driver.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
       --conf spark.kubernetes.executor.secrets.spark-truststore=/spark-truststore \
       --conf spark.kubernetes.driver.secrets.spark-truststore=/spark-truststore \
-      --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark:3.4-22.04_edge
+      --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark@sha256:f5cbbceb09818a51129f05473fee5d01c4a18d19e0a900179c2c099476af3c16
   
   echo "Print current config."
   spark-client.service-account-registry get-config --username hello
