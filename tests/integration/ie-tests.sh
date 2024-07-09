@@ -406,6 +406,7 @@ run_spark_submit_custom_certificate(){
   
   cp /etc/ssl/certs/java/cacerts cacerts
   cp /etc/ssl/certs/adoptium/cacerts cacerts
+  chmod 777 cacerts
   ls -larth
   # create certificate for running the Spark Job
   # keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
