@@ -405,6 +405,7 @@ run_spark_submit_custom_certificate(){
   cp $S3_CA_BUNDLE_PATH ca.pem
   
   cp /etc/ssl/certs/java/cacerts cacerts
+  cp /etc/ssl/certs/adoptium/cacerts cacerts
   ls -larth
   # create certificate for running the Spark Job
   # keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
