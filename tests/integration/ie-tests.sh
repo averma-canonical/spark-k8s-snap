@@ -404,6 +404,7 @@ run_spark_submit_custom_certificate(){
   echo "Generate truststore"
   cp $S3_CA_BUNDLE_PATH ca.pem
   
+  cp /etc/ssl/certs/java/cacerts cacerts
   # create certificate for running the Spark Job
   keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
 
