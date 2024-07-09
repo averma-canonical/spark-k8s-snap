@@ -391,7 +391,6 @@ run_spark_submit_custom_certificate(){
     --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true \
     --conf spark.hadoop.fs.s3a.path.style.access=true \
     --conf spark.eventLog.enabled=true \
-    --conf spark.kubernetes.file.upload.path=s3a://dist-cache/ \
     --conf spark.eventLog.dir=s3a://history-server/spark-events/ \
     --conf spark.history.fs.logDirectory=s3a://history-server/spark-events/
 
@@ -410,7 +409,8 @@ run_spark_submit_custom_certificate(){
   ls -larth
   # create certificate for running the Spark Job
   # keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
-  keytool -import -v -alias ceph-cert -file ca.pem -storepass changeit -noprompt -keystore cacerts
+  # keytool -import -v -alias ceph-cert -file ca.pem -storepass changeit -noprompt -keystore cacerts
+  keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
   ls -larth
   mv cacerts spark.truststore
 
@@ -418,13 +418,13 @@ run_spark_submit_custom_certificate(){
   sudo microk8s.kubectl create secret generic spark-truststore --from-file spark.truststore
 
   # Import certificate
-  echo "Import certificate"
-  spark-client.import-certificate ceph-cert ca.pem
+  # echo "Import certificate"
+  # spark-client.import-certificate ceph-cert ca.pem
 
   echo "Configure Service account with the new certificate"
   spark-client.service-account-registry add-config --username hello \
-      --conf spark.executor.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.debug=SSL,handshake,data,trustmanager" \
-      --conf spark.driver.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.debug=SSL,handshake,data,trustmanager" \
+      --conf spark.executor.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
+      --conf spark.driver.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
       --conf spark.kubernetes.executor.secrets.spark-truststore=/spark-truststore \
       --conf spark.kubernetes.driver.secrets.spark-truststore=/spark-truststore \
       --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark:3.4-22.04_edge
@@ -435,9 +435,10 @@ run_spark_submit_custom_certificate(){
   echo "Run Spark job"
   # spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --files="./tests/integration/resources/example.txt" --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
   
-  spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
+ #  spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
 
-  
+  spark-client.spark-submit --username hello --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
+
   # kubectl --kubeconfig=${KUBE_CONFIG} get pods
   DRIVER_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)
 
