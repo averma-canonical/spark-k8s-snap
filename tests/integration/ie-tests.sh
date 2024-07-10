@@ -400,15 +400,10 @@ run_spark_submit_custom_certificate(){
 
   echo "Actual configs"
   spark-client.service-account-registry get-config --username hello
-  
 
   echo "Generate truststore"
   cp $S3_CA_BUNDLE_PATH ca.pem
-  
-  # cp /etc/ssl/certs/java/cacerts cacerts
-  # cp /etc/ssl/certs/adoptium/cacerts cacerts
-  # chmod 777 cacerts
-  # ls -larth
+
   # create certificate for running the Spark Job
   keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
   ls -larth
@@ -433,10 +428,6 @@ run_spark_submit_custom_certificate(){
   spark-client.service-account-registry get-config --username hello
 
   echo "Run Spark job"
-  # spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --files="./tests/integration/resources/example.txt" --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
-  
- #  spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
-
   spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark:3.4.2-22.04_edge --conf spark.kubernetes.executor.request.cores=0.1 --files="./tests/integration/resources/example.txt" --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
 
   DRIVER_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)
@@ -596,61 +587,61 @@ echo -e "##################################"
 echo -e "RUN EXAMPLE JOB"
 echo -e "##################################"
 
-# (setup_user_admin_context && test_spark_pi_example && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_pi_example && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN SPARK SHELL JOB"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN SPARK SHELL JOB"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_spark_shell && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_shell && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN SPARK SQL JOB WITH S3"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN SPARK SQL JOB WITH S3"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_spark_sql_with_s3 && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_sql_with_s3 && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN SPARK SQL JOB WITH AZURE ABFSS"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN SPARK SQL JOB WITH AZURE ABFSS"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_spark_sql_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_spark_sql_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN PYSPARK JOB WITH S3"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN PYSPARK JOB WITH S3"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_pyspark_with_s3 && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_pyspark_with_s3 && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN PYSPARK JOB WITH AZURE ABFSS"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN PYSPARK JOB WITH AZURE ABFSS"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_pyspark_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_pyspark_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN EXAMPLE JOB WITH S3"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN EXAMPLE JOB WITH S3"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_example_job_with_s3 && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_example_job_with_s3 && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN EXAMPLE JOB WITH AZURE ABFSS"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN EXAMPLE JOB WITH AZURE ABFSS"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_example_job_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_example_job_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "RUN EXAMPLE WITH RESTRICTED ACCOUNT"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "RUN EXAMPLE WITH RESTRICTED ACCOUNT"
+echo -e "##################################"
 
-# (setup_user_restricted_context && test_restricted_account && cleanup_user_success) || cleanup_user_failure
+(setup_user_restricted_context && test_restricted_account && cleanup_user_success) || cleanup_user_failure
 
-# echo -e "##################################"
-# echo -e "TEST KUBECONFIG ENV VARIABLE"
-# echo -e "##################################"
+echo -e "##################################"
+echo -e "TEST KUBECONFIG ENV VARIABLE"
+echo -e "##################################"
 
-# (setup_user_admin_context && test_custom_kubeconfig_example && cleanup_user_success) || cleanup_user_failure
+(setup_user_admin_context && test_custom_kubeconfig_example && cleanup_user_success) || cleanup_user_failure
 
 
 echo -e "##################################"
