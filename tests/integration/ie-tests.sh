@@ -391,6 +391,8 @@ run_spark_submit_custom_certificate(){
     --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true \
     --conf spark.hadoop.fs.s3a.path.style.access=true \
     --conf spark.eventLog.enabled=true \
+    --conf spark.hadoop.fs.s3a.fast.upload=true \
+    --conf spark.kubernetes.file.upload.path=s3a://dist-cache/ \
     --conf spark.eventLog.dir=s3a://history-server/ \
     --conf spark.history.fs.logDirectory=s3a://history-server/
 
@@ -435,9 +437,8 @@ run_spark_submit_custom_certificate(){
   
  #  spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.executor.request.cores=0.1 --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
 
-  spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark:3.4.2-22.04_edge --conf spark.kubernetes.executor.request.cores=0.1 --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
+  spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark:3.4.2-22.04_edge --conf spark.kubernetes.executor.request.cores=0.1 --files="./tests/integration/resources/example.txt" --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
 
-  # kubectl --kubeconfig=${KUBE_CONFIG} get pods
   DRIVER_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)
 
   if [[ "${DRIVER_JOB}" == "${PREVIOUS_JOB}" ]]
