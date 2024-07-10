@@ -391,8 +391,8 @@ run_spark_submit_custom_certificate(){
     --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true \
     --conf spark.hadoop.fs.s3a.path.style.access=true \
     --conf spark.eventLog.enabled=true \
-    --conf spark.eventLog.dir=s3a://history-server/spark-events/ \
-    --conf spark.history.fs.logDirectory=s3a://history-server/spark-events/
+    --conf spark.eventLog.dir=s3a://history-server/ \
+    --conf spark.history.fs.logDirectory=s3a://history-server/
 
   aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 ls
 
@@ -403,13 +403,11 @@ run_spark_submit_custom_certificate(){
   echo "Generate truststore"
   cp $S3_CA_BUNDLE_PATH ca.pem
   
-  cp /etc/ssl/certs/java/cacerts cacerts
-  cp /etc/ssl/certs/adoptium/cacerts cacerts
-  chmod 777 cacerts
-  ls -larth
+  # cp /etc/ssl/certs/java/cacerts cacerts
+  # cp /etc/ssl/certs/adoptium/cacerts cacerts
+  # chmod 777 cacerts
+  # ls -larth
   # create certificate for running the Spark Job
-  # keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
-  # keytool -import -v -alias ceph-cert -file ca.pem -storepass changeit -noprompt -keystore cacerts
   keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
   ls -larth
   mv cacerts spark.truststore
@@ -419,7 +417,7 @@ run_spark_submit_custom_certificate(){
 
   # Import certificate
   # echo "Import certificate"
-  # spark-client.import-certificate ceph-cert ca.pem
+  spark-client.import-certificate ceph-cert ca.pem
 
   echo "Configure Service account with the new certificate"
   spark-client.service-account-registry add-config --username hello \
@@ -427,7 +425,7 @@ run_spark_submit_custom_certificate(){
       --conf spark.driver.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
       --conf spark.kubernetes.executor.secrets.spark-truststore=/spark-truststore \
       --conf spark.kubernetes.driver.secrets.spark-truststore=/spark-truststore \
-      --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark@sha256:f5cbbceb09818a51129f05473fee5d01c4a18d19e0a900179c2c099476af3c16
+      --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark:3.4.2-22.04_edge
   
   echo "Print current config."
   spark-client.service-account-registry get-config --username hello
