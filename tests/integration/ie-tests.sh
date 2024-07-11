@@ -373,7 +373,7 @@ run_spark_submit_custom_certificate(){
   echo $S3_SECRET_KEY
   echo $S3_CA_BUNDLE_PATH
 
-  # reconfigure the aws lib to work with local instance of aws
+  # reconfigure the aws lib to work with local instance of microceph behind haproxy
   aws configure set aws_access_key_id $S3_ACCESS_KEY
   aws configure set aws_secret_access_key $S3_SECRET_KEY
   aws configure set default.region "us-east-1"
@@ -396,6 +396,8 @@ run_spark_submit_custom_certificate(){
     --conf spark.eventLog.dir=s3a://history-server/ \
     --conf spark.history.fs.logDirectory=s3a://history-server/
 
+  # list buckets 
+  echo "Current buckets:"
   aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 ls
 
   echo "Actual configs"
@@ -406,7 +408,7 @@ run_spark_submit_custom_certificate(){
 
   # create certificate for running the Spark Job
   keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
-  ls -larth
+
   mv cacerts spark.truststore
 
   echo "Create secret for truststore"
@@ -416,7 +418,7 @@ run_spark_submit_custom_certificate(){
   # echo "Import certificate"
   spark-client.import-certificate ceph-cert ca.pem
 
-  echo "Configure Service account with the new certificate"
+  echo "Configure spark job with the new certificate"
   spark-client.service-account-registry add-config --username hello \
       --conf spark.executor.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
       --conf spark.driver.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
@@ -438,13 +440,7 @@ run_spark_submit_custom_certificate(){
     exit 1
   fi
 
-  echo -e "Inspecting logs for driver job: ${DRIVER_JOB}"
-  # kubectl --kubeconfig=${KUBE_CONFIG} logs ${DRIVER_JOB}
-
-  EXECUTOR_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep exec | tail -n 1 | cut -d' ' -f1)
-  echo -e "Inspecting state of executor job: ${EXECUTOR_JOB}"
-  # kubectl --kubeconfig=${KUBE_CONFIG} describe pod ${EXECUTOR_JOB}
-
+  # retrieve driver logs
   logs=$(kubectl --kubeconfig=${KUBE_CONFIG} logs $(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)  -n ${NAMESPACE})
   echo "logs: $logs"
   # Check job output
