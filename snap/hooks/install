@@ -10,7 +10,10 @@ export DATA="${SNAP_COMMON}"/var/lib/$COMPONENT
 mkdir -p $LOGS
 mkdir -p $DATA
 
-cp -r $SNAP/etc/ ${SNAP_DATA}
+cp -r $SNAP/etc ${SNAP_DATA}
+# copy original cacerts in SNAP_DATA
+cp $SNAP/etc/cacerts ${SNAP_DATA}/etc/ssl/certs/java/
 
 chmod -R 775 "${SNAP_DATA}"/*
 chmod -R 775 "${SNAP_COMMON}"/*
+chmod -R 777 "${SNAP_DATA}"/etc/ssl/certs/java/cacerts

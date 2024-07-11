@@ -183,6 +183,7 @@ run_spark_shell() {
   echo -e "$(cat ./tests/integration/resources/test-spark-shell.scala | spark-client.spark-shell \
       --username=${USERNAME} \
       --conf spark.kubernetes.container.image=$SPARK_IMAGE \
+      --conf spark.executor.instances=2 \
       --namespace ${NAMESPACE})" \
       > spark-shell.out
   pi=$(cat spark-shell.out  | grep "^Pi is roughly" | rev | cut -d' ' -f1 | rev | cut -c 1-3)
@@ -218,7 +219,6 @@ run_pyspark(){
   validate_file_length $l
   return $?
 }
-
 
 test_pyspark_with_s3(){
   temp_script_file=/tmp/test-pyspark-s3.py
@@ -351,6 +351,107 @@ test_example_job_with_s3() {
   if [ $retcode -eq 1 ]; then
     exit 1
   fi
+}
+
+test_spark_submit_custom_certificate() {
+  run_spark_submit_custom_certificate
+}
+
+run_spark_submit_custom_certificate(){
+  
+  KUBE_CONFIG=/home/${USER}/.kube/config
+
+  # delete username if it exist
+  spark-client.service-account-registry delete --username hello
+  
+  # source configuration for microceph 
+  source microceph.source
+  NAMESPACE="default"
+  echo "MICRO-CEPH credentials"
+  echo $S3_SERVER_URL
+  echo $S3_ACCESS_KEY
+  echo $S3_SECRET_KEY
+  echo $S3_CA_BUNDLE_PATH
+
+  # reconfigure the aws lib to work with local instance of microceph behind haproxy
+  aws configure set aws_access_key_id $S3_ACCESS_KEY
+  aws configure set aws_secret_access_key $S3_SECRET_KEY
+  aws configure set default.region "us-east-1"
+
+  # create folder
+  aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 mb "s3://dist-cache" 
+  aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 mb "s3://history-server"
+
+  # create service account 
+  spark-client.service-account-registry create --username hello \
+    --conf spark.hadoop.fs.s3a.access.key=$S3_ACCESS_KEY \
+    --conf spark.hadoop.fs.s3a.secret.key=$S3_SECRET_KEY \
+    --conf spark.hadoop.fs.s3a.endpoint=$S3_SERVER_URL \
+    --conf spark.hadoop.fs.s3a.aws.credentials.provider=org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider \
+    --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true \
+    --conf spark.hadoop.fs.s3a.path.style.access=true \
+    --conf spark.eventLog.enabled=true \
+    --conf spark.hadoop.fs.s3a.fast.upload=true \
+    --conf spark.kubernetes.file.upload.path=s3a://dist-cache/ \
+    --conf spark.eventLog.dir=s3a://history-server/ \
+    --conf spark.history.fs.logDirectory=s3a://history-server/
+
+  # list buckets 
+  echo "Current buckets:"
+  aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 ls
+
+  echo "Actual configs"
+  spark-client.service-account-registry get-config --username hello
+
+  echo "Generate truststore"
+  cp $S3_CA_BUNDLE_PATH ca.pem
+
+  # create certificate for running the Spark Job
+  keytool -import -alias ceph-cert -file ca.pem -storetype JKS -keystore cacerts -storepass changeit -noprompt
+
+  mv cacerts spark.truststore
+
+  echo "Create secret for truststore"
+  sudo microk8s.kubectl create secret generic spark-truststore --from-file spark.truststore
+
+  # Import certificate
+  # echo "Import certificate"
+  spark-client.import-certificate ceph-cert ca.pem
+
+  echo "Configure spark job with the new certificate"
+  spark-client.service-account-registry add-config --username hello \
+      --conf spark.executor.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
+      --conf spark.driver.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
+      --conf spark.kubernetes.executor.secrets.spark-truststore=/spark-truststore \
+      --conf spark.kubernetes.driver.secrets.spark-truststore=/spark-truststore \
+      --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark:3.4.2-22.04_edge
+  
+  echo "Print current config."
+  spark-client.service-account-registry get-config --username hello
+
+  echo "Run Spark job"
+  spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark:3.4.2-22.04_edge --conf spark.kubernetes.executor.request.cores=0.1 --files="./tests/integration/resources/example.txt" --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
+
+  DRIVER_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)
+
+  if [[ "${DRIVER_JOB}" == "${PREVIOUS_JOB}" ]]
+  then
+    echo "ERROR: Sample job has not run!"
+    exit 1
+  fi
+
+  # retrieve driver logs
+  logs=$(kubectl --kubeconfig=${KUBE_CONFIG} logs $(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)  -n ${NAMESPACE})
+  echo "logs: $logs"
+  # Check job output
+  # Sample output
+  # "Pi is roughly 3.13956232343"
+  pi=$(kubectl --kubeconfig=${KUBE_CONFIG} logs $(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)  -n ${NAMESPACE} | grep 'Pi is roughly' | rev | cut -d' ' -f1 | rev | cut -c 1-3)
+  echo -e "Spark Pi Job Output: \n ${pi}"
+
+  aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 ls "s3://dist-cache" 
+  validate_pi_value $pi
+
 }
 
 
@@ -503,7 +604,7 @@ echo -e "##################################"
 (setup_user_admin_context && test_spark_sql_with_azure_abfss && cleanup_user_success) || cleanup_user_failure
 
 echo -e "##################################"
-echo -e "RUN PYSPARK JOB WITH S#"
+echo -e "RUN PYSPARK JOB WITH S3"
 echo -e "##################################"
 
 (setup_user_admin_context && test_pyspark_with_s3 && cleanup_user_success) || cleanup_user_failure
@@ -538,6 +639,14 @@ echo -e "##################################"
 
 (setup_user_admin_context && test_custom_kubeconfig_example && cleanup_user_success) || cleanup_user_failure
 
+
+echo -e "##################################"
+echo -e "TEST SELF SIGNED CERTIFICATE"
+echo -e "##################################"
+
+(setup_user_admin_context && test_spark_submit_custom_certificate && cleanup_user_success) || cleanup_user_failure
+
 echo -e "##################################"
 echo -e "END OF THE TEST!"
 echo -e "##################################"
+

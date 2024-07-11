@@ -39,6 +39,7 @@ apps:
     command:  etc/spark8t/launcher.sh $SNAP/lib/python3.10/site-packages/spark8t/cli/spark_submit.py
     environment:
       PYTHONPATH: $SNAP/python:$SNAP/lib/python3.10/site-packages:$PYTHONPATH
+      _JAVA_OPTIONS: "-Duser.home=$SNAP_USER_DATA -Djavax.net.ssl.trustStore=$SNAP_DATA/etc/ssl/certs/java/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
     plugs:
         - network
         - home
@@ -48,6 +49,7 @@ apps:
     environment:
       PYTHONPATH: $SNAP/python:$SNAP/lib/python3.10/site-packages:$PYTHONPATH
       SPARK8T_EXTRA_CONF: --conf spark.driver.extraJavaOptions="-Duser.home=$SNAP_USER_DATA" --conf spark.jars.ivy=/tmp
+      _JAVA_OPTIONS: "-Duser.home=$SNAP_USER_DATA -Djavax.net.ssl.trustStore=$SNAP_DATA/etc/ssl/certs/java/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
     plugs:
         - network
         - network-bind
@@ -58,6 +60,7 @@ apps:
     environment:
       PYTHONPATH: $SNAP/python:$SNAP/lib/python3.10/site-packages:$PYTHONPATH
       SPARK8T_EXTRA_CONF: --conf spark.driver.extraJavaOptions="-Duser.home=$SNAP_USER_DATA" --conf spark.jars.ivy=/tmp
+      _JAVA_OPTIONS: "-Duser.home=$SNAP_USER_DATA -Djavax.net.ssl.trustStore=$SNAP_DATA/etc/ssl/certs/java/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
     plugs:
         - network
         - network-bind
@@ -68,6 +71,17 @@ apps:
     environment:
       PYTHONPATH: $SNAP/python:$SNAP/lib/python3.10/site-packages:$PYTHONPATH
       SPARK8T_EXTRA_CONF: --conf spark.driver.extraJavaOptions="-Duser.home=$SNAP_USER_DATA" --conf spark.jars.ivy=/tmp
+      _JAVA_OPTIONS: "-Duser.home=$SNAP_USER_DATA -Djavax.net.ssl.trustStore=$SNAP_DATA/etc/ssl/certs/java/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
+    plugs:
+        - network
+        - network-bind
+        - home
+        - dot-kube-config
+
+  import-certificate:
+    command: etc/spark8t/bin/import-certificate.sh
+    environment:
+      _JAVA_OPTIONS: "-Duser.home=$SNAP_USER_DATA"
     plugs:
         - network
         - network-bind
@@ -79,11 +93,16 @@ parts:
   spark8t-conf:
     plugin: dump
     source: snap/local
+    override-prime: |
+      craftctl default
+      chmod +x etc/spark8t/bin/import-certificate.sh
+      mkdir -p home/ubuntu
+      chmod u+x home/ubuntu/
 
   spark8t:
     plugin: python
     python-packages:
-        - https://github.com/canonical/spark-k8s-toolkit-py/releases/download/v0.0.7/spark8t-0.0.7-py3-none-any.whl
+        - https://github.com/canonical/spark-k8s-toolkit-py/releases/download/v0.0.10/spark8t-0.0.10-py3-none-any.whl
     source: .
     build-packages:
         - python3
@@ -136,8 +155,9 @@ parts:
 
     override-prime: |
         snapcraftctl prime
-        rm -vf usr/lib/jvm/java-11-openjdk-*/lib/security/blacklisted.certs
-
+        rm -vf usr/lib/jvm/java-17-openjdk-*/lib/security/blacklisted.certs 
+        # move base certs data
+        mv etc/ssl/certs/java/cacerts etc/cacerts
   kubectl:
     plugin: nil
     build-packages:
