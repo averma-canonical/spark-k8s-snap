@@ -102,7 +102,7 @@ parts:
   spark8t:
     plugin: python
     python-packages:
-        - git+https://github.com/canonical/spark-k8s-toolkit-py.git@dpe-3552
+        - https://github.com/canonical/spark-k8s-toolkit-py/releases/download/v0.0.10/spark8t-0.0.10-py3-none-any.whl
     source: .
     build-packages:
         - python3
