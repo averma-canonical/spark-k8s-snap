@@ -7,7 +7,9 @@ source ./tests/integration/utils/s3-utils.sh
 source ./tests/integration/utils/azure-utils.sh
 
 
-readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark:3.4-22.04_edge'
+readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark:3.5-22.04_edge'
+readonly SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.5.1.jar'
+
 S3_BUCKET=test-snap-$(uuidgen)
 SERVICE_ACCOUNT=spark
 NAMESPACE=tests
@@ -79,7 +81,6 @@ run_spark_pi_example() {
   KUBE_CONFIG=/home/${USER}/.kube/config
 
   K8S_MASTER_URL=k8s://$(kubectl --kubeconfig=${KUBE_CONFIG} config view -o jsonpath="{.clusters[0]['cluster.server']}")
-  SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.4.2.jar'
 
   PREVIOUS_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods | grep driver | tail -n 1 | cut -d' ' -f1)
 
@@ -136,7 +137,6 @@ run_custom_kubeconfig_example() {
   echo "Testing wrong kubeconfig"
 
   K8S_MASTER_URL=k8s://$(kubectl --kubeconfig=${KUBE_CONFIG} config view -o jsonpath="{.clusters[0]['cluster.server']}")
-  SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.4.2.jar'
 
   PREVIOUS_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods | grep driver | tail -n 1 | cut -d' ' -f1)
 
@@ -424,13 +424,19 @@ run_spark_submit_custom_certificate(){
       --conf spark.driver.extraJavaOptions="-Djavax.net.ssl.trustStore=/spark-truststore/spark.truststore -Djavax.net.ssl.trustStorePassword=changeit" \
       --conf spark.kubernetes.executor.secrets.spark-truststore=/spark-truststore \
       --conf spark.kubernetes.driver.secrets.spark-truststore=/spark-truststore \
-      --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark:3.4.2-22.04_edge
-  
+      --conf spark.kubernetes.container.image=$SPARK_IMAGE
+
   echo "Print current config."
   spark-client.service-account-registry get-config --username hello
 
   echo "Run Spark job"
-  spark-client.spark-submit --username hello -v --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true --conf spark.kubernetes.container.image=ghcr.io/canonical/charmed-spark:3.4.2-22.04_edge --conf spark.kubernetes.executor.request.cores=0.1 --files="./tests/integration/resources/example.txt" --class org.apache.spark.examples.SparkPi local:///opt/spark/examples/jars/spark-examples_2.12-3.4.2.jar 100
+  spark-client.spark-submit \
+    --username hello -v \
+    --conf spark.hadoop.fs.s3a.connection.ssl.enabled=true \
+    --conf spark.kubernetes.executor.request.cores=0.1 \
+    --files="./tests/integration/resources/example.txt" \
+    --class org.apache.spark.examples.SparkPi \
+    local:///opt/spark/examples/jars/$SPARK_EXAMPLES_JAR_NAME 100
 
   DRIVER_JOB=$(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)
 
