@@ -1,7 +1,7 @@
 name: Detect upstream Spark updates
 
 env:
-  BASE_BRANCH: 3.4/edge
+  BASE_BRANCH: 3.5/edge
   UPDATE_BRANCH: bot/update-spark-version
 
 on:

@@ -1,9 +1,10 @@
-name: Release to 3.4 channels
+name: Release to channels
 
 on:
   push:
     branches:
       - 3.4/*
+      - 3.5/*
 
 jobs:
   release_checks:
