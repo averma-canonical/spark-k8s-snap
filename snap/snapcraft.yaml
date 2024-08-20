@@ -1,6 +1,6 @@
 name: spark-client
 base: core22
-version: '3.5.1'
+version: '4.0.0-preview1'
 summary: Client side scripts to submit Spark jobs to a cluster.
 description: |
   The spark-client snap includes the scripts spark-submit, spark-shell, pyspark and other tools for managing Apache Spark jobs.
