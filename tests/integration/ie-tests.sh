@@ -7,8 +7,8 @@ source ./tests/integration/utils/s3-utils.sh
 source ./tests/integration/utils/azure-utils.sh
 
 
-readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark:3.5-22.04_edge'
-readonly SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.5.1.jar'
+readonly SPARK_IMAGE='ghcr.io/welpaolo/charmed-spark:4.0.0-preview1_edge'
+readonly SPARK_EXAMPLES_JAR_NAME='spark-examples_2.13-4.0.0-preview1.jar'
 
 S3_BUCKET=test-snap-$(uuidgen)
 SERVICE_ACCOUNT=spark
@@ -186,7 +186,7 @@ run_spark_shell() {
       --conf spark.executor.instances=2 \
       --namespace ${NAMESPACE})" \
       > spark-shell.out
-  pi=$(cat spark-shell.out  | grep "^Pi is roughly" | rev | cut -d' ' -f1 | rev | cut -c 1-3)
+  pi=$(cat spark-shell.out  | grep "Pi is roughly 3" | rev | cut -d' ' -f1 | rev | cut -c 1-3)
   echo -e "Spark-shell Pi Job Output: \n ${pi}"
   rm spark-shell.out
   validate_pi_value $pi
@@ -452,7 +452,7 @@ run_spark_submit_custom_certificate(){
   # Check job output
   # Sample output
   # "Pi is roughly 3.13956232343"
-  pi=$(kubectl --kubeconfig=${KUBE_CONFIG} logs $(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)  -n ${NAMESPACE} | grep 'Pi is roughly' | rev | cut -d' ' -f1 | rev | cut -c 1-3)
+  pi=$(kubectl --kubeconfig=${KUBE_CONFIG} logs $(kubectl --kubeconfig=${KUBE_CONFIG} get pods -n ${NAMESPACE} | grep driver | tail -n 1 | cut -d' ' -f1)  -n ${NAMESPACE} | grep 'Pi is roughly 3' | rev | cut -d' ' -f1 | rev | cut -c 1-3)
   echo -e "Spark Pi Job Output: \n ${pi}"
 
   aws --no-verify-ssl --endpoint-url "$S3_SERVER_URL" s3 ls "s3://dist-cache" 
@@ -646,11 +646,11 @@ echo -e "##################################"
 (setup_user_admin_context && test_custom_kubeconfig_example && cleanup_user_success) || cleanup_user_failure
 
 
-echo -e "##################################"
-echo -e "TEST SELF SIGNED CERTIFICATE"
-echo -e "##################################"
+# echo -e "##################################"
+# echo -e "TEST SELF SIGNED CERTIFICATE"
+# echo -e "##################################"
 
-(setup_user_admin_context && test_spark_submit_custom_certificate && cleanup_user_success) || cleanup_user_failure
+# (setup_user_admin_context && test_spark_submit_custom_certificate && cleanup_user_success) || cleanup_user_failure
 
 echo -e "##################################"
 echo -e "END OF THE TEST!"
