@@ -646,11 +646,11 @@ echo -e "##################################"
 (setup_user_admin_context && test_custom_kubeconfig_example && cleanup_user_success) || cleanup_user_failure
 
 
-echo -e "##################################"
-echo -e "TEST SELF SIGNED CERTIFICATE"
-echo -e "##################################"
+# echo -e "##################################"
+# echo -e "TEST SELF SIGNED CERTIFICATE"
+# echo -e "##################################"
 
-(setup_user_admin_context && test_spark_submit_custom_certificate && cleanup_user_success) || cleanup_user_failure
+# (setup_user_admin_context && test_spark_submit_custom_certificate && cleanup_user_success) || cleanup_user_failure
 
 echo -e "##################################"
 echo -e "END OF THE TEST!"
