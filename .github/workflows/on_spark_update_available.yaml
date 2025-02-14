@@ -12,7 +12,7 @@ on:
 jobs:
   check-spark:
     name: Check if Spark update is available
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 5
     outputs:
       decision: ${{ steps.check-latest-spark-version.outputs.decision }}
@@ -48,7 +48,7 @@ jobs:
   create-or-update-pull-request:
     name: Create or update pull request
     if: needs.check-spark.outputs.decision  ==  '1'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 5
     needs:
       - check-spark

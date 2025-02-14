@@ -8,7 +8,7 @@ source ./tests/integration/utils/azure-utils.sh
 
 
 readonly SPARK_IMAGE='ghcr.io/canonical/charmed-spark:3.5-22.04_edge'
-readonly SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.5.1.jar'
+readonly SPARK_EXAMPLES_JAR_NAME='spark-examples_2.12-3.5.4.jar'
 
 S3_BUCKET=test-snap-$(uuidgen)
 SERVICE_ACCOUNT=spark
